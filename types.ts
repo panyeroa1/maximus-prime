@@ -29,3 +29,8 @@ export interface Tool {
   description: string;
   functionDeclaration: FunctionDeclaration;
 }
+
+export interface ActiveToolCall {
+  name: string;
+  args: any;
+}

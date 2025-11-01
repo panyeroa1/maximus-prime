@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { LiveServerMessage, LiveSession, Blob } from '@google/genai';
+// FIX: The `LiveSession` type is not exported from @google/genai.
+import { LiveServerMessage, Blob } from '@google/genai';
 import { TopBar } from './components/TopBar';
 import { ControlBar } from './components/ControlBar';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
@@ -8,7 +9,7 @@ import { Settings } from './components/Settings';
 import { Workspace } from './components/Workspace';
 import { startLiveSession } from './services/geminiService';
 import { decode, decodeAudioData, encode } from './services/audioUtils';
-import { AppSettings, ConversationTurn } from './types';
+import { AppSettings, ConversationTurn, ActiveToolCall } from './types';
 
 const DEFAULT_ROLE = "a friendly and helpful assistant.";
 const DEFAULT_INSTRUCTIONS = "Keep your responses concise and to the point. Be polite and professional.";
@@ -20,6 +21,7 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showCaptions, setShowCaptions] = useState(false);
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [activeToolCall, setActiveToolCall] = useState<ActiveToolCall | null>(null);
   
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
@@ -47,7 +49,8 @@ export default function App() {
     };
   });
 
-  const sessionPromiseRef = useRef<Promise<LiveSession> | null>(null);
+  // FIX: The `LiveSession` type is not exported from @google/genai, so use `any` for the session object promise.
+  const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -79,6 +82,7 @@ export default function App() {
 
   const startRecording = useCallback(async () => {
     if (isRecording) return;
+    setActiveToolCall(null);
     setIsRecording(true);
     addTurn({ speaker: 'system', text: 'Connecting...' });
 
@@ -166,9 +170,14 @@ export default function App() {
             }
             currentInputTranscriptionRef.current = '';
             currentOutputTranscriptionRef.current = '';
+            setActiveToolCall(null);
         }
 
         if (message.toolCall) {
+            const firstCall = message.toolCall.functionCalls[0];
+            if (firstCall) {
+              setActiveToolCall({ name: firstCall.name, args: firstCall.args });
+            }
             message.toolCall.functionCalls.forEach(fc => {
                 addTurn({ speaker: 'system', text: `Tool call: ${fc.name}(${JSON.stringify(fc.args)})` });
                 // In a real app, you would execute the function here and send back the result.
@@ -223,6 +232,7 @@ export default function App() {
     stopAudioPlayback();
     
     sessionPromiseRef.current = null;
+    setActiveToolCall(null);
     setIsRecording(false);
     setIsSpeaking(false);
   }, [isRecording]);
@@ -260,7 +270,7 @@ export default function App() {
 
       <main className="flex-1 flex flex-col items-center justify-center relative">
         <VoiceVisualizer isRecording={isRecording} isSpeaking={isSpeaking} />
-        <Workspace />
+        <Workspace activeToolCall={activeToolCall} />
         {showCaptions && <Captions conversation={conversation} />}
       </main>
 

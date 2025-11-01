@@ -1,4 +1,5 @@
-import { GoogleGenAI, LiveSession, LiveCallbacks, Modality, FunctionDeclaration } from '@google/genai';
+// FIX: The `LiveSession` type is not exported from @google/genai.
+import { GoogleGenAI, LiveCallbacks, Modality, FunctionDeclaration } from '@google/genai';
 import { ALL_TOOLS } from '../constants/tools';
 import { AppSettings } from '../types';
 
@@ -18,7 +19,8 @@ function getAiInstance() {
 export function startLiveSession(
   settings: AppSettings,
   callbacks: LiveCallbacks
-): Promise<LiveSession> {
+// FIX: The `LiveSession` type is not exported from @google/genai, so use `any` for the return promise.
+): Promise<any> {
   const ai = getAiInstance();
 
   const systemInstruction = `You are Maximus, ${settings.role}. ${settings.instructions}`;
