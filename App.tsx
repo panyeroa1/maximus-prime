@@ -1,5 +1,7 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { LiveServerMessage, Modality, Blob, CloseEvent, ErrorEvent, GenerateContentResponse, FunctionCall } from '@google/genai';
+// FIX: Removed CloseEvent and ErrorEvent from @google/genai import, as they are standard DOM types.
+import { LiveServerMessage, Modality, Blob, GenerateContentResponse, FunctionCall } from '@google/genai';
 
 // Components
 import { TopBar } from './components/TopBar';
@@ -57,6 +59,7 @@ export default function App() {
   const [isSessionActive, setIsSessionActive] = useState(false); // Represents an active call
   const [isModelSpeaking, setIsModelSpeaking] = useState(false);
   const [isMicActive, setIsMicActive] = useState(false); // User has enabled microphone
+  const [micAmplitude, setMicAmplitude] = useState(0); // For visualizer
   
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({ mode: 'idle', content: null, message: '' });
   
@@ -68,6 +71,8 @@ export default function App() {
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const audioSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const nextAudioStartTimeRef = useRef<number>(0);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
   
   // Refs for transcription buffering
   const currentInputTranscriptionRef = useRef('');
@@ -158,44 +163,54 @@ export default function App() {
     try {
       switch (name) {
         case 'generateImage':
-          const imageUrl = await geminiService.generateImage(args.prompt, args.aspectRatio);
-          workspaceContent = { type: 'image', data: imageUrl, prompt: args.prompt };
+          // FIX: Cast arguments to expected types.
+          const imageUrl = await geminiService.generateImage(args.prompt as string, args.aspectRatio as '1:1' | '16:9' | '9:16' | '4:3' | '3:4');
+          // FIX: Cast arguments to expected types.
+          workspaceContent = { type: 'image', data: imageUrl, prompt: args.prompt as string };
           result = { success: true, message: `Image generated and displayed.` };
           break;
         case 'groundedSearch':
-          const searchResponse = await geminiService.generateTextWithGoogleSearch(args.query);
+          // FIX: Cast arguments to expected types.
+          const searchResponse = await geminiService.generateTextWithGoogleSearch(args.query as string);
           const searchSources = searchResponse.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.web) || [];
           workspaceContent = { type: 'grounding_search', data: { text: searchResponse.text, sources: searchSources }};
           result = { success: true, text: searchResponse.text, sources: searchSources.map((s:any) => s.uri) };
           break;
         case 'groundedMapSearch':
-           const mapResponse = await geminiService.generateTextWithGoogleMaps(args.query);
+           // FIX: Cast arguments to expected types.
+           const mapResponse = await geminiService.generateTextWithGoogleMaps(args.query as string);
            const mapSources = mapResponse.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.maps) || [];
            workspaceContent = { type: 'grounding_maps', data: { text: mapResponse.text, sources: mapSources }};
            result = { success: true, text: mapResponse.text, sources: mapSources.map((s:any) => s.uri) };
            break;
         case 'quickQuery':
-          const quickText = await geminiService.generateLowLatencyText(args.query);
+          // FIX: Cast arguments to expected types.
+          const quickText = await geminiService.generateLowLatencyText(args.query as string);
           result = { text: quickText };
           addTurn({ speaker: 'model', text: quickText }); // Also show in captions
           break;
         case 'speakText':
-           const audioB64 = await geminiService.generateSpeech(args.text);
+           // FIX: Cast arguments to expected types.
+           const audioB64 = await geminiService.generateSpeech(args.text as string);
            await playAudio(audioB64);
            result = { success: true, message: `Spoke the text.` };
            break;
         case 'generateCode':
-            const code = await geminiService.generateProText(`Generate ${args.language} code for the following description: ${args.description}`);
-            workspaceContent = { type: 'code', data: { language: args.language, text: code } };
+            // FIX: Cast arguments to expected types.
+            const code = await geminiService.generateProText(`Generate ${args.language as string} code for the following description: ${args.description as string}`);
+            // FIX: Cast arguments to expected types.
+            workspaceContent = { type: 'code', data: { language: args.language as string, text: code } };
             result = { success: true, message: `Code generated and displayed.` };
             break;
         case 'summarizeLongText':
-             const summary = await geminiService.generateProText(`Task: ${args.request}. Text: ${args.text}`);
+             // FIX: Cast arguments to expected types.
+             const summary = await geminiService.generateProText(`Task: ${args.request as string}. Text: ${args.text as string}`);
              workspaceContent = { type: 'text', data: summary };
              result = { success: true, summary: summary };
              break;
         case 'useSubAgentLLM':
-            const subAgentRes = await subAgentService.callSubAgent(args.provider, args.prompt, args.model, settings.serverSettings);
+            // FIX: Cast arguments to expected types.
+            const subAgentRes = await subAgentService.callSubAgent(args.provider as string, args.prompt as string, args.model as string, settings.serverSettings);
             result = { success: true, response: subAgentRes.text };
             addTurn({ speaker: 'model', text: `Sub-agent response: ${subAgentRes.text}` });
             break;
@@ -304,6 +319,27 @@ export default function App() {
 
     try {
       mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+      const analyser = inputAudioContextRef.current.createAnalyser();
+      analyser.fftSize = 256;
+      analyserRef.current = analyser;
+
+      const visualizeMic = () => {
+        if (!analyserRef.current) {
+          animationFrameRef.current = null;
+          return;
+        }
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        analyserRef.current.getByteFrequencyData(dataArray);
+
+        const sum = dataArray.reduce((acc, val) => acc + val, 0);
+        const avg = sum / bufferLength;
+        const normalized = Math.min(avg / 128, 1.0); // Normalize to 0-1 and clamp
+        setMicAmplitude(normalized);
+
+        animationFrameRef.current = requestAnimationFrame(visualizeMic);
+      };
       
       const callbacks = {
         onopen: () => {
@@ -320,8 +356,11 @@ export default function App() {
             };
             sessionPromiseRef.current?.then((session) => session.sendRealtimeInput({ media: pcmBlob }));
           };
-          source.connect(scriptProcessor);
+          source.connect(analyserRef.current!);
+          analyserRef.current!.connect(scriptProcessor);
           scriptProcessor.connect(inputAudioContextRef.current!.destination);
+          
+          visualizeMic();
         },
         onmessage: (message: LiveServerMessage) => {
           if (message.serverContent?.modelTurn?.parts[0]?.inlineData?.data) {
@@ -373,10 +412,17 @@ export default function App() {
   const endSession = useCallback(() => {
     setIsSessionActive(false);
     setIsMicActive(false);
+    setMicAmplitude(0);
     stopAllAudio();
+
+    if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+    }
 
     mediaStreamRef.current?.getTracks().forEach(track => track.stop());
     scriptProcessorRef.current?.disconnect();
+    analyserRef.current?.disconnect();
     inputAudioContextRef.current?.close();
     outputAudioContextRef.current?.close();
 
@@ -384,16 +430,19 @@ export default function App() {
 
     mediaStreamRef.current = null;
     scriptProcessorRef.current = null;
+    analyserRef.current = null;
     inputAudioContextRef.current = null;
     outputAudioContextRef.current = null;
     sessionPromiseRef.current = null;
   }, [stopAllAudio]);
 
   const onToggleRecording = () => {
-    if (!isSessionActive) {
-        startSession();
+    if (isSessionActive) {
+       setIsMicActive(prev => !prev);
+    } else {
+       startSession();
+       setIsMicActive(true);
     }
-    setIsMicActive(prev => !prev); // This button just toggles mute in this setup
   };
 
   const handleSaveSettings = (newSettings: AppSettings) => {
@@ -415,7 +464,7 @@ export default function App() {
         onToggleCaptions={() => setShowCaptions(p => !p)}
       />
       
-      <VoiceVisualizer isRecording={isMicActive} isSpeaking={isModelSpeaking} />
+      <VoiceVisualizer isRecording={isMicActive} isSpeaking={isModelSpeaking} micAmplitude={micAmplitude} />
 
       {showCaptions && <Captions conversation={conversation} />}
       
