@@ -197,13 +197,13 @@ export default function App() {
       };
   }, []);
 
-  const stopAudioPlayback = () => {
+  const stopAudioPlayback = useCallback(() => {
     if (outputAudioContextRef.current) {
         audioSourcesRef.current.forEach(source => { try { source.stop(); } catch (e) {} });
         audioSourcesRef.current.clear();
         nextStartTimeRef.current = 0;
     }
-  };
+  }, []);
 
   const playChime = () => {
     if (outputAudioContextRef.current) {
@@ -220,6 +220,43 @@ export default function App() {
         o.stop(context.currentTime + 0.5);
     }
   }
+
+  const stopRecording = useCallback(async (closeSession = true) => {
+    if (closeSession && sessionPromiseRef.current) {
+      try {
+        const session = await sessionPromiseRef.current;
+        session?.close();
+      } catch (e) {
+        console.warn("Error closing session:", e);
+      }
+    }
+    sessionPromiseRef.current = null;
+
+    scriptProcessorRef.current?.disconnect();
+    scriptProcessorRef.current = null;
+
+    mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+    mediaStreamRef.current = null;
+
+    stopAudioPlayback();
+
+    if (inputAudioContextRef.current) {
+      if (inputAudioContextRef.current.state !== 'closed') {
+        inputAudioContextRef.current.close().catch(e => console.warn("Error closing input audio context:", e));
+      }
+      inputAudioContextRef.current = null;
+    }
+
+    if (outputAudioContextRef.current) {
+      if (outputAudioContextRef.current.state !== 'closed') {
+        outputAudioContextRef.current.close().catch(e => console.warn("Error closing output audio context:", e));
+      }
+      outputAudioContextRef.current = null;
+    }
+
+    setIsRecording(false);
+    setIsSpeaking(false);
+  }, [stopAudioPlayback]);
 
   const startRecording = useCallback(async () => {
     if (isRecording) return;
@@ -394,24 +431,7 @@ export default function App() {
       },
     });
 
-  }, [isRecording, addTurn, settings, conversation, playAudio]);
-
-  const stopRecording = useCallback(async (closeSession = true) => {
-    if (!isRecording && !sessionPromiseRef.current) return;
-    if (closeSession && sessionPromiseRef.current) {
-      try { (await sessionPromiseRef.current).close(); } catch (e) {}
-    }
-    scriptProcessorRef.current?.disconnect();
-    scriptProcessorRef.current = null;
-    mediaStreamRef.current?.getTracks().forEach(track => track.stop());
-    mediaStreamRef.current = null;
-    inputAudioContextRef.current?.close().catch(console.error);
-    outputAudioContextRef.current?.close().catch(console.error);
-    stopAudioPlayback();
-    sessionPromiseRef.current = null;
-    setIsRecording(false);
-    setIsSpeaking(false);
-  }, [isRecording]);
+  }, [isRecording, addTurn, settings, conversation, playAudio, stopRecording, stopAudioPlayback]);
 
   const handleToggleRecording = () => isRecording ? stopRecording() : startRecording();
   
@@ -454,10 +474,8 @@ export default function App() {
     uploadedFileRef.current = { base64: a, mimeType: t, url: url };
     
     if (file.type.startsWith('audio/')) {
-        // FIX: Add missing 'message' property to satisfy WorkspaceState type.
-        setWorkspaceState({ mode: 'result', uploadAction: 'transcribeAudio', message: '', content: {type: 'text', data: {text: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`}}});
+        setWorkspaceState({ mode: 'result', uploadAction: 'transcribeAudio', message: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`, content: {type: 'text', data: {text: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`}}});
     } else { // assume video or image
-        // FIX: Add missing 'message' property to satisfy WorkspaceState type.
         setWorkspaceState({ mode: 'result', uploadAction: 'analyzeImage', message: '', content: { type: 'video', data: url } });
     }
   }
