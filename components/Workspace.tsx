@@ -24,6 +24,7 @@ const ActionSelector: React.FC<{ onSelect: (action: MediaAction) => void; onCanc
     { id: 'editImage', title: 'Edit Image', description: 'Upload an image to edit with a prompt.' },
     { id: 'generateVideo', title: 'Generate Video', description: 'Use an image and prompt to create a video.' },
     { id: 'transcribeAudio', title: 'Transcribe File', description: 'Upload an audio or video file for transcription.' },
+    { id: 'analyzeTradingData', title: 'Analyze Trading Data', description: 'Upload MT4/MT5 data for probability analysis.'},
     { id: 'recordMedia', title: 'Record Camera', description: 'Use your camera to record a new video clip.' },
     { id: 'recordScreen', title: 'Record Screen', description: 'Capture your screen with audio.' },
   ];
@@ -57,10 +58,19 @@ const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction: WorkspaceS
     }
   };
   
-  const isAudio = uploadAction === 'transcribeAudio';
-  const acceptType = isAudio ? 'audio/*,video/*' : 'image/*,video/*';
-  const title = isAudio ? 'Upload an Audio or Video File' : 'Upload an Image or Video';
-  const description = isAudio ? 'Select a file to transcribe.' : 'Select a media file to continue.';
+  let acceptType = 'image/*,video/*';
+  let title = 'Upload an Image or Video';
+  let description = 'Select a media file to continue.';
+
+  if (uploadAction === 'transcribeAudio') {
+    acceptType = 'audio/*,video/*';
+    title = 'Upload an Audio or Video File';
+    description = 'Select a file to transcribe.';
+  } else if (uploadAction === 'analyzeTradingData') {
+    acceptType = '.csv,text/plain';
+    title = 'Upload Trading Data';
+    description = 'Select a .csv or .txt file with your trading history.';
+  }
 
   return (
     <div className="text-center">

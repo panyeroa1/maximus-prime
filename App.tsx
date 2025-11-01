@@ -9,7 +9,7 @@ import { Captions } from './components/Captions';
 import { Settings } from './components/Settings';
 import { Workspace } from './components/Workspace';
 
-import { startLiveSession, analyzeImage, editImage, generateVideo, transcribeAudio } from './services/geminiService';
+import { startLiveSession, analyzeImage, editImage, generateVideo, transcribeAudio, analyzeTradingDataWithFlash } from './services/geminiService';
 import { executeTool } from './services/subAgentService';
 import { decode, encode, decodeAudioData } from './services/audioUtils';
 
@@ -80,7 +80,7 @@ EXAMPLE SSML TEMPLATES (FOR YOUR OWN USE)
 
 - One clarifying question:
   <speak>
-    <prosody rate="95%" pitch="+2st">Boss, mabilis lang na tanong: gusto niyo po ba port <say-as interpret-as="digits">8788</say-as> pa rin, o gamitin natin <say-as interpret-as="digits">3000</say-as>? Sabihin niyo lang at susunod ako. </prosody>
+    <prosody rate="95%" pitch="+2st">Boss, mabilis lang na tanong: gusto niyo po ba port <say-as interpret-as="digits">8788</say-as> pa rin, o gamitin natin <say-as interpret-as="digits">3000</as-as>? Sabihin niyo lang at susunod ako. </prosody>
   </speak>
 
 - Error found during self-verify (non-blocking):
@@ -114,6 +114,14 @@ const fileToBase64 = (file: File): Promise<string> =>
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = () => resolve((reader.result as string).split(',')[1]);
+    reader.onerror = (error) => reject(error);
+  });
+
+const fileAsText = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsText(file);
+    reader.onload = () => resolve(reader.result as string);
     reader.onerror = (error) => reject(error);
   });
 
@@ -452,13 +460,15 @@ function App() {
     const isAudio = file.type.startsWith('audio');
     const isVideo = file.type.startsWith('video');
     const isImage = file.type.startsWith('image');
-    
-    let contentType: 'image' | 'video' = 'image';
+    const isText = file.type.startsWith('text') || file.name.endsWith('.csv');
+
+    let contentType: 'image' | 'video' | 'text' = 'image';
     if (isVideo || isAudio) contentType = 'video'; // Use video player for audio too
+    if (isText) contentType = 'text';
 
     setWorkspaceState({ 
       mode: 'result', 
-      content: { type: contentType, data: URL.createObjectURL(file), prompt: '' }, 
+      content: { type: contentType, data: contentType === 'text' ? { text: 'File loaded.' } : URL.createObjectURL(file), prompt: '' }, 
       uploadAction: action,
       message: '' 
     });
@@ -473,35 +483,43 @@ function App() {
       const response = await fetch(data);
       const blob = await response.blob();
       const file = new File([blob], "inputfile", {type: blob.type});
-      const base64 = await fileToBase64(file);
-      const mimeType = file.type;
 
       setWorkspaceState(prev => ({ ...prev, mode: 'processing', message: 'Working on it...', content: { ...prev.content!, prompt } }));
 
       try {
         let result: any;
-        if (action === 'analyzeImage') {
-            result = await analyzeImage(base64, mimeType, prompt);
-            setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: result }}, message: 'Analysis complete.' });
-        } else if (action === 'editImage') {
-            result = await editImage(base64, mimeType, prompt);
-            setWorkspaceState({ mode: 'result', content: { type: 'image', data: result}, message: 'Edit complete.' });
-        } else if (action === 'transcribeAudio') {
-            result = await transcribeAudio(base64, mimeType, prompt);
-            setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: result }}, message: 'Transcription complete.' });
-        } else if (action === 'generateVideo') {
-            try {
-              result = await generateVideo(base64, mimeType, prompt, '16:9', (status) => {
-                setWorkspaceState(prev => ({...prev, message: status}));
-              });
-              setWorkspaceState({ mode: 'result', content: { type: 'video', data: result }, message: 'Video generated.' });
-            } catch (e: any) {
-               if (e.message === 'API_KEY_REQUIRED') {
-                 setWorkspaceState(prev => ({...prev, mode: 'api_key_needed' }));
-               } else {
-                 throw e;
-               }
-            }
+        if (action === 'analyzeTradingData') {
+          const fileText = await fileAsText(file);
+          result = await analyzeTradingDataWithFlash(fileText, prompt);
+          setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: result }}, message: 'Analysis complete.' });
+        } else {
+          // Handle other media types
+          const base64 = await fileToBase64(file);
+          const mimeType = file.type;
+
+          if (action === 'analyzeImage') {
+              result = await analyzeImage(base64, mimeType, prompt);
+              setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: result }}, message: 'Analysis complete.' });
+          } else if (action === 'editImage') {
+              result = await editImage(base64, mimeType, prompt);
+              setWorkspaceState({ mode: 'result', content: { type: 'image', data: result}, message: 'Edit complete.' });
+          } else if (action === 'transcribeAudio') {
+              result = await transcribeAudio(base64, mimeType, prompt);
+              setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: result }}, message: 'Transcription complete.' });
+          } else if (action === 'generateVideo') {
+              try {
+                result = await generateVideo(base64, mimeType, prompt, '16:9', (status) => {
+                  setWorkspaceState(prev => ({...prev, message: status}));
+                });
+                setWorkspaceState({ mode: 'result', content: { type: 'video', data: result }, message: 'Video generated.' });
+              } catch (e: any) {
+                 if (e.message === 'API_KEY_REQUIRED') {
+                   setWorkspaceState(prev => ({...prev, mode: 'api_key_needed' }));
+                 } else {
+                   throw e;
+                 }
+              }
+          }
         }
       } catch (e) {
          setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: `An error occurred: ${e}`}}, message: 'Error.' });

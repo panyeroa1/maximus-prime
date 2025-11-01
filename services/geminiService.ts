@@ -22,16 +22,19 @@ export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks
     .filter(tool => settings.enabledTools.includes(tool.name) && tool.functionDeclaration)
     .map(tool => tool.functionDeclaration!);
 
-  const finalTools: any[] = [];
+  // Refactored Tool Configuration for stability
+  const toolConfig: any = {};
   if (functionDeclarations.length > 0) {
-    finalTools.push({ functionDeclarations });
+    toolConfig.functionDeclarations = functionDeclarations;
   }
   if (settings.enabledTools.includes('groundedSearch')) {
-    finalTools.push({ googleSearch: {} });
+    toolConfig.googleSearch = {};
   }
   if (settings.enabledTools.includes('groundedMapSearch')) {
-    finalTools.push({ googleMaps: {} });
+    toolConfig.googleMaps = {};
   }
+
+  const tools = Object.keys(toolConfig).length > 0 ? [toolConfig] : undefined;
 
   return ai.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -41,9 +44,8 @@ export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice as any } },
       },
-      // Fix: systemInstruction must be a Content object, not a raw string.
       systemInstruction: { parts: [{ text: settings.systemInstruction }] },
-      tools: finalTools.length > 0 ? finalTools : undefined,
+      tools: tools,
       outputAudioTranscription: {},
       inputAudioTranscription: {},
     },
@@ -235,6 +237,22 @@ export async function transcribeAudio(audioBase64: string, mimeType: string, pro
             { inlineData: { data: audioBase64, mimeType } },
             { text: prompt },
         ] },
+    });
+    return response.text;
+}
+
+// Data Analysis Sub-Agent
+export async function analyzeTradingDataWithFlash(tradingData: string, analysisPrompt: string): Promise<string> {
+    const ai = getAiInstance();
+    const systemInstruction = `You are a quantitative analyst. Your task is to analyze the provided trading data and answer the user's question. Provide a clear, data-driven response, focusing on probabilities and statistical insights. The data is from MT4/MT5 trading history.`;
+    const fullPrompt = `User's question: "${analysisPrompt}"\n\nTrading Data:\n\`\`\`\n${tradingData}\n\`\`\``;
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: fullPrompt,
+        config: {
+            systemInstruction,
+        }
     });
     return response.text;
 }

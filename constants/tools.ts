@@ -48,6 +48,28 @@ export const ALL_TOOLS: Tool[] = [
     },
   },
   {
+    name: 'analyzeTradingData',
+    description: 'Analyzes trading data (e.g., from MT4/MT5) to calculate probabilities and provide insights.',
+    functionDeclaration: {
+      name: 'analyzeTradingData',
+      description: 'Performs data analysis on a provided string of trading data using a specialized sub-agent.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          tradingData: {
+            type: Type.STRING,
+            description: 'The trading data, typically in CSV or text format.',
+          },
+          analysisPrompt: {
+            type: Type.STRING,
+            description: 'The specific question or analysis to perform on the data (e.g., "What is the probability of the next trade being profitable?").',
+          },
+        },
+        required: ['tradingData', 'analysisPrompt'],
+      },
+    },
+  },
+  {
     name: 'groundedSearch',
     description: 'Perform a Google Search to answer questions about recent events or provide up-to-date information.',
   },

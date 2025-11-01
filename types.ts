@@ -39,7 +39,7 @@ export interface ActiveToolCall {
 // Workspace State Types
 export type WorkspaceMode = 'idle' | 'action_select' | 'upload' | 'processing' | 'result' | 'api_key_needed' | 'recording' | 'screen_sharing_setup';
 
-export type UploadAction = 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio';
+export type UploadAction = 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'analyzeTradingData';
 export type MediaAction = UploadAction | 'recordMedia' | 'recordScreen';
 
 

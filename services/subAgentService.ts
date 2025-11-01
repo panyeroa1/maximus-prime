@@ -1,6 +1,7 @@
 import {
   generateImage,
   generateProText,
+  analyzeTradingDataWithFlash,
 } from './geminiService';
 import { ActiveToolCall, WorkspaceContent } from '../types';
 
@@ -23,13 +24,18 @@ export async function executeTool(toolCall: ActiveToolCall): Promise<WorkspaceCo
         };
       }
 
+      case 'analyzeTradingData': {
+        const result = await analyzeTradingDataWithFlash(toolCall.args.tradingData, toolCall.args.analysisPrompt);
+        return { type: 'text', data: { text: result }, prompt: toolCall.args.analysisPrompt };
+      }
+
       default:
         console.warn(`Unknown tool call: ${toolCall.name}`);
-        return { type: 'text', data: `Error: Tool "${toolCall.name}" is not implemented.` };
+        return { type: 'text', data: { text: `Error: Tool "${toolCall.name}" is not implemented.` } };
     }
   } catch (error) {
     console.error(`Error executing tool ${toolCall.name}:`, error);
     const errorMessage = error instanceof Error ? error.message : String(error);
-    return { type: 'text', data: `Error executing tool "${toolCall.name}": ${errorMessage}` };
+    return { type: 'text', data: { text: `Error executing tool "${toolCall.name}": ${errorMessage}` } };
   }
 }
