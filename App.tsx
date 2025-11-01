@@ -175,6 +175,14 @@ function App() {
     }
     inputAudioContextRef.current = null;
   }, []);
+
+  // Centralized cleanup logic for when a session ends for any reason
+  const handleSessionEnd = useCallback(() => {
+    stopAudioPlayback();
+    // Setting isRecording to false will trigger the useEffect to clean up the mic
+    setIsRecording(false); 
+    sessionPromiseRef.current = null;
+  }, []);
   
   const onLiveMessage = useCallback(async (message: LiveServerMessage) => {
     if (message.serverContent) {
@@ -204,7 +212,6 @@ function App() {
 
     if (message.toolCall?.functionCalls) {
       for (const fc of message.toolCall.functionCalls) {
-        // Fix: Ensure function call has a name before executing, and pass a valid ActiveToolCall object.
         if (fc.name) {
           appendToConversation({ speaker: 'system', text: `Calling tool: ${fc.name}(${JSON.stringify(fc.args)})` });
           setWorkspaceState({ mode: 'processing', message: `Executing tool: ${fc.name}...`, content: null });
@@ -230,14 +237,13 @@ function App() {
       sessionPromiseRef.current = startLiveSession(appSettings, {
         onopen: () => console.log('Session opened'),
         onmessage: onLiveMessage,
-        onerror: (e: ErrorEvent) => console.error('Session error:', e),
+        onerror: (e: ErrorEvent) => {
+          console.error('Session error:', e.message);
+          handleSessionEnd();
+        },
         onclose: (e: CloseEvent) => {
           console.log('Session closed');
-          sessionPromiseRef.current = null;
-          if (isRecording) {
-            setIsRecording(false);
-            stopAudioPlayback();
-          }
+          handleSessionEnd();
         },
       });
       await sessionPromiseRef.current;
@@ -247,20 +253,21 @@ function App() {
       console.error('Failed to start session:', error);
       sessionPromiseRef.current = null;
     }
-  }, [isRecording, appSettings, onLiveMessage, playChime]);
+  }, [isRecording, appSettings, onLiveMessage, playChime, handleSessionEnd]);
 
   const stopSession = useCallback(() => {
     if (sessionPromiseRef.current) {
         sessionPromiseRef.current.then(session => {
           session.close();
-        }).catch(e => console.error("Error closing session:", e));
-        sessionPromiseRef.current = null;
+        }).catch(e => {
+            console.error("Error trying to close session, cleaning up manually:", e);
+            handleSessionEnd();
+        });
+    } else {
+        console.log("No active session, cleaning up UI state.");
+        handleSessionEnd();
     }
-    if (isRecording) {
-      setIsRecording(false);
-      stopAudioPlayback();
-    }
-  }, [isRecording]);
+  }, [handleSessionEnd]);
 
   const handleToggleRecording = useCallback(() => {
     if (isRecording) {
@@ -322,13 +329,15 @@ function App() {
     };
   }, [isRecording, stopMicAndCleanup]);
 
+  // Effect to manage the lifecycle of the persistent output audio context
   useEffect(() => {
+    initOutputAudioContext();
     return () => {
         if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
             outputAudioContextRef.current.close().catch(console.warn);
         }
     }
-  }, []);
+  }, [initOutputAudioContext]);
 
   useEffect(() => {
     let animationFrameId: number;
