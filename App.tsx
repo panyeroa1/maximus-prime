@@ -365,7 +365,12 @@ function App() {
   useEffect(() => {
     const setupMic = async () => {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+              audio: {
+                noiseSuppression: true,
+                echoCancellation: true,
+              },
+            });
             mediaStreamRef.current = stream;
             
             const Ctx = window.AudioContext || (window as any).webkitAudioContext;
