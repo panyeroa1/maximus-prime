@@ -206,20 +206,37 @@ export default function App() {
   }, []);
 
   const playChime = () => {
-    if (outputAudioContextRef.current) {
-        const context = outputAudioContextRef.current;
-        const o = context.createOscillator();
-        const g = context.createGain();
-        o.connect(g);
-        g.connect(context.destination);
-        o.type = 'sine';
-        o.frequency.setValueAtTime(880, context.currentTime);
-        g.gain.setValueAtTime(0.2, context.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.5);
-        o.start(context.currentTime);
-        o.stop(context.currentTime + 0.5);
-    }
-  }
+    if (!outputAudioContextRef.current) return;
+
+    const context = outputAudioContextRef.current;
+    const now = context.currentTime;
+    
+    // Tone 1
+    const osc1 = context.createOscillator();
+    const gain1 = context.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now); // A5
+    osc1.connect(gain1);
+    gain1.connect(context.destination);
+    
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
+    osc1.start(now);
+    osc1.stop(now + 0.25);
+
+    // Tone 2
+    const osc2 = context.createOscillator();
+    const gain2 = context.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1046.50, now + 0.1); // C6
+    osc2.connect(gain2);
+    gain2.connect(context.destination);
+    
+    gain2.gain.setValueAtTime(0.2, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.35);
+  };
 
   const stopRecording = useCallback(async (closeSession = true) => {
     if (closeSession && sessionPromiseRef.current) {
@@ -476,7 +493,7 @@ export default function App() {
     if (file.type.startsWith('audio/')) {
         setWorkspaceState({ mode: 'result', uploadAction: 'transcribeAudio', message: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`, content: {type: 'text', data: {text: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`}}});
     } else { // assume video or image
-        setWorkspaceState({ mode: 'result', uploadAction: 'analyzeImage', message: '', content: { type: 'video', data: url } });
+        setWorkspaceState({ mode: 'result', uploadAction: 'analyzeImage', message: `Ready to analyze, edit, or create a video from ${file.name}.`, content: { type: 'video', data: url } });
     }
   }
 
