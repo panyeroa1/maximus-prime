@@ -59,7 +59,7 @@ export const Settings: React.FC<SettingsProps> = ({
     });
   };
 
-  const handleServerSettingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleServerSettingChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setServerSettings(prev => ({ ...prev, [name]: value }));
   };
@@ -69,17 +69,20 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   const toolCategories = {
-    'Core Capabilities': ['deepThink', 'performGoogleSearch', 'findNearbyPlaces', 'performLowLatencyQuery'],
-    'Social & Content': ['postToTwitter', 'postToLinkedIn', 'getLatestYoutubeComments', 'scheduleInstagramPost', 'startTikTokLive', 'generateContentIdeas', 'generateImage'],
-    'Productivity & Google Suite': ['scheduleCalendarEvent', 'sendEmail', 'querySalesforce', 'createJiraTicket', 'summarizeDocument', 'takeNote', 'translateText', 'manageGmail', 'editGoogleDoc', 'editGoogleSheet', 'manageGoogleDrive'],
-    'Utilities': ['getStockPrice', 'getWeather', 'setTimer', 'playMusic', 'getFact', 'controlSmartHomeDevice', 'getRealTimeTraffic'],
+    'Core & Grounding': ['groundedSearch', 'groundedMapSearch', 'quickQuery'],
+    'Media Generation & Editing': ['generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage'],
+    'Audio': ['speakText'],
   };
 
-  const getCategoryForTool = (toolName: string) => {
+  const getCategoryForTool = (toolName: string): string => {
     for (const category in toolCategories) {
         if ((toolCategories as any)[category].includes(toolName)) {
             return category;
         }
+    }
+    const oldTools = ALL_TOOLS.map(t => t.name);
+    if (oldTools.includes(toolName)) {
+        return "Legacy Tools";
     }
     return 'Other';
   }
@@ -158,7 +161,7 @@ export const Settings: React.FC<SettingsProps> = ({
             <h2 className="text-2xl font-semibold mb-4 text-blue-400">Toolbox</h2>
             <p className="text-gray-400 mb-8">Enable or disable tools to customize Maximus's capabilities.</p>
             <div className="space-y-8">
-              {Object.keys(categorizedTools).map((category) => (
+              {Object.keys(categorizedTools).sort().map((category) => (
                 <div key={category}>
                     <h3 className="text-xl font-bold text-gray-300 mb-4 border-b border-gray-800 pb-2">{category}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
@@ -184,54 +187,81 @@ export const Settings: React.FC<SettingsProps> = ({
         {activeTab === 'server' && (
             <section className="animate-fade-in">
                 <h2 className="text-2xl font-semibold mb-4 text-blue-400">Server & Integrations</h2>
-                <p className="text-gray-400 mb-8">Configure credentials for third-party services. These are stored locally and are not shared.</p>
-                <div className="space-y-8">
-                  {/* Twilio */}
+                <p className="text-gray-400 mb-8">Configure credentials for Google Cloud and other third-party services. These are stored locally in your browser.</p>
+                <div className="space-y-10">
+                  
+                  {/* Google Cloud */}
                   <div>
-                    <h3 className="text-lg font-bold text-gray-300 mb-4">Twilio</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Google Cloud Services</h3>
+                    <p className="text-sm text-gray-500 mb-4">Required for advanced Google services not covered by the default API key.</p>
+                    <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Account SID</label>
-                            <input name="twilioSid" value={serverSettings.twilioSid} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Google Cloud Project ID</label>
+                            <input name="googleCloudProjectId" value={serverSettings.googleCloudProjectId} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <p className="text-xs text-gray-500 mt-1">Find your Project ID in the <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google Cloud Console</a>.</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Auth Token</label>
-                            <input name="twilioAuthToken" type="password" value={serverSettings.twilioAuthToken} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Service Account Key (JSON)</label>
+                            <textarea name="googleCloudServiceAccountJson" value={serverSettings.googleCloudServiceAccountJson} onChange={handleServerSettingChange} rows={5} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm" placeholder='Paste the content of your service account JSON file here.' />
+                            <p className="text-xs text-gray-500 mt-1">Create a service account with appropriate roles (e.g., Vertex AI User) and download the JSON key. <a href="https://cloud.google.com/iam/docs/service-accounts-create" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Learn how</a>.</p>
                         </div>
                     </div>
                   </div>
-                   {/* Bland.ai & Cartesia */}
+
+                  {/* Telephony */}
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Telephony</h3>
+                     <div className="space-y-4">
+                         <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Twilio Account SID</label>
+                            <input name="twilioSid" value={serverSettings.twilioSid} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Twilio Auth Token</label>
+                            <input name="twilioAuthToken" type="password" value={serverSettings.twilioAuthToken} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <p className="text-xs text-gray-500 mt-1">Find your Twilio credentials on your <a href="https://www.twilio.com/console" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">console dashboard</a>.</p>
+                        </div>
+                    </div>
+                  </div>
+                  
+                   {/* Sub-Agent Services */}
                    <div>
-                    <h3 className="text-lg font-bold text-gray-300 mb-4">Voice & AI Services</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Sub-Agent Voice & AI Services</h3>
+                    <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Bland.ai API Key</label>
                             <input name="blandApiKey" type="password" value={serverSettings.blandApiKey} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                             <p className="text-xs text-gray-500 mt-1">Get your key from the <a href="https://app.bland.ai/dashboard" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Bland.ai dashboard</a>.</p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Cartesia API Key</label>
                             <input name="cartesiaApiKey" type="password" value={serverSettings.cartesiaApiKey} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <p className="text-xs text-gray-500 mt-1">Get your key from the <a href="https://cartesia.ai/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Cartesia website</a>.</p>
                         </div>
                          <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">ElevenLabs API Key</label>
                             <input name="elevenLabsApiKey" type="password" value={serverSettings.elevenLabsApiKey} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                             <p className="text-xs text-gray-500 mt-1">Get your key from your <a href="https://elevenlabs.io/speech-synthesis" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">ElevenLabs profile</a>.</p>
                         </div>
                     </div>
                   </div>
-                  {/* Ollama */}
+                  
+                  {/* Sub-Agent LLMs */}
                   <div>
-                    <h3 className="text-lg font-bold text-gray-300 mb-4">Ollama Cloud</h3>
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <h3 className="text-xl font-bold text-gray-300 mb-2">Sub-Agent LLM Providers</h3>
+                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">Cloud Endpoint URL</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Ollama Cloud Endpoint URL</label>
                             <input name="ollamaCloudEndpoint" value={serverSettings.ollamaCloudEndpoint} onChange={handleServerSettingChange} placeholder="e.g., https://api.ollama.cloud" className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-300 mb-2">API Key</label>
+                            <label className="block text-sm font-medium text-gray-300 mb-2">Ollama Cloud API Key</label>
                             <input name="ollamaCloudApiKey" type="password" value={serverSettings.ollamaCloudApiKey} onChange={handleServerSettingChange} className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <p className="text-xs text-gray-500 mt-1">For use with <a href="https://ollama.com/blog/ollama-is-now-available-as-a-cloud-api" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Ollama Cloud</a> or other compatible endpoints.</p>
                         </div>
                     </div>
                   </div>
+
                 </div>
             </section>
         )}

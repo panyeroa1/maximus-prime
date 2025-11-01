@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-// FIX: The `LiveSession` type is not exported from @google/genai.
 import { LiveServerMessage, Blob } from '@google/genai';
 import { TopBar } from './components/TopBar';
 import { ControlBar } from './components/ControlBar';
@@ -7,9 +6,9 @@ import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { Captions } from './components/Captions';
 import { Settings } from './components/Settings';
 import { Workspace } from './components/Workspace';
-import { startLiveSession } from './services/geminiService';
+import * as geminiService from './services/geminiService';
 import { decode, decodeAudioData, encode } from './services/audioUtils';
-import { AppSettings, ConversationTurn, ActiveToolCall } from './types';
+import { AppSettings, ConversationTurn, WorkspaceState } from './types';
 
 const DEFAULT_SYSTEM_INSTRUCTION = `SYSTEM PROMPT — ALEX (SSML VOICE MODE, PINOY)
 
@@ -95,24 +94,26 @@ REPLY FLOW (ALWAYS)
 END OF SYSTEM PROMPT`;
 const DEFAULT_VOICE = 'Orus';
 
-const MAX_MEMORY_TURNS = 6; // How many past turns to include in the context
+const MAX_MEMORY_TURNS = 6;
 
-// Helper to construct the prompt with memory
 const constructSystemPromptWithMemory = (baseInstruction: string, history: ConversationTurn[]): string => {
-  if (history.length === 0) {
-    return baseInstruction;
-  }
-  
+  if (history.length === 0) return baseInstruction;
   const recentHistory = history.slice(-MAX_MEMORY_TURNS);
   const memoryBlock = recentHistory.map(turn => `${turn.speaker.toUpperCase()}: ${turn.text}`).join('\n');
-  
-  return `PREVIOUS CONVERSATION HISTORY (FOR CONTEXT):
----
-${memoryBlock}
----
+  return `PREVIOUS CONVERSATION HISTORY (FOR CONTEXT):\n---\n${memoryBlock}\n---\n\nCURRENT TASK:\n${baseInstruction}`;
+};
 
-CURRENT TASK:
-${baseInstruction}`;
+const fileToBase64 = (file: File): Promise<{ a: string, t: string }> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            const b64 = result.split(',')[1];
+            resolve({ a: b64, t: file.type });
+        };
+        reader.onerror = error => reject(error);
+    });
 };
 
 
@@ -120,66 +121,46 @@ export default function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [showCaptions, setShowCaptions] = useState(true); // Default captions to on
+  const [showCaptions, setShowCaptions] = useState(true);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>(() => {
      try {
-        const savedConversation = localStorage.getItem('maximus-conversation');
-        return savedConversation ? JSON.parse(savedConversation) : [];
+        const saved = localStorage.getItem('maximus-conversation');
+        return saved ? JSON.parse(saved) : [];
      } catch (e) {
-        console.error("Could not parse conversation from localStorage", e);
         return [];
      }
   });
 
-  const [activeToolCall, setActiveToolCall] = useState<ActiveToolCall | null>(null);
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({ mode: 'idle', content: null, message: '' });
+  const uploadedFileRef = useRef<{ base64: string, mimeType: string, url: string } | null>(null);
   
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
-        const savedSettings = localStorage.getItem('maximus-settings');
-        if (savedSettings) {
-          const parsed = JSON.parse(savedSettings);
-          // Gracefully handle migration from old format (role/instructions) to new format (systemInstruction)
-          if (parsed.role || parsed.instructions) {
-            return {
-              ...parsed,
-              systemInstruction: `You are Maximus, ${parsed.role || 'a helpful assistant'}. ${parsed.instructions || ''}`,
-              role: undefined,
-              instructions: undefined,
-            };
-          }
-          return parsed;
-        }
-    } catch (e) {
-        console.error("Could not parse settings from localStorage", e);
-    }
-    return {
-      systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
-      voice: DEFAULT_VOICE,
-      enabledTools: ['performGoogleSearch', 'generateImage', 'getStockPrice', 'getWeather'],
-      serverSettings: {
-        twilioSid: '',
-        twilioAuthToken: '',
-        blandApiKey: '',
-        cartesiaApiKey: '',
-        elevenLabsApiKey: '',
-        ollamaCloudEndpoint: '',
-        ollamaCloudApiKey: '',
-      },
-    };
+        const saved = localStorage.getItem('maximus-settings');
+        return saved ? JSON.parse(saved) : {
+          systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
+          voice: DEFAULT_VOICE,
+          enabledTools: ['groundedSearch', 'groundedMapSearch', 'generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage', 'quickQuery', 'speakText'],
+          serverSettings: {
+            googleCloudProjectId: '',
+            googleCloudServiceAccountJson: '',
+            twilioSid: '',
+            twilioAuthToken: '',
+            blandApiKey: '',
+            cartesiaApiKey: '',
+            elevenLabsApiKey: '',
+            ollamaCloudEndpoint: '',
+            ollamaCloudApiKey: ''
+          },
+        };
+    } catch (e) { return {} as AppSettings; }
   });
 
-  // Persist conversation to localStorage
   useEffect(() => {
-    try {
-      localStorage.setItem('maximus-conversation', JSON.stringify(conversation));
-    } catch (e) {
-      console.error("Could not save conversation to localStorage", e);
-    }
+    localStorage.setItem('maximus-conversation', JSON.stringify(conversation));
   }, [conversation]);
 
-
-  // FIX: The `LiveSession` type is not exported from @google/genai, so use `any` for the session object promise.
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -196,23 +177,51 @@ export default function App() {
     setConversation(prev => [...prev, { ...turn, timestamp: Date.now() }]);
   }, []);
 
+  const playAudio = useCallback(async (base64Audio: string) => {
+      if (!outputAudioContextRef.current) return;
+      setIsSpeaking(true);
+      const audioBuffer = await decodeAudioData(decode(base64Audio), outputAudioContextRef.current, 24000, 1);
+      const source = outputAudioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(outputAudioContextRef.current.destination);
+      const currentTime = outputAudioContextRef.current.currentTime;
+      nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
+      source.start(nextStartTimeRef.current);
+      nextStartTimeRef.current += audioBuffer.duration;
+      audioSourcesRef.current.add(source);
+      source.onended = () => {
+          audioSourcesRef.current.delete(source);
+          if (audioSourcesRef.current.size === 0) setIsSpeaking(false);
+      };
+  }, []);
+
   const stopAudioPlayback = () => {
     if (outputAudioContextRef.current) {
-        audioSourcesRef.current.forEach(source => {
-            try {
-                source.stop();
-            } catch (e) {
-                // Ignore errors from stopping already stopped sources
-            }
-        });
+        audioSourcesRef.current.forEach(source => { try { source.stop(); } catch (e) {} });
         audioSourcesRef.current.clear();
         nextStartTimeRef.current = 0;
     }
   };
 
+  const playChime = () => {
+    if (outputAudioContextRef.current) {
+        const context = outputAudioContextRef.current;
+        const o = context.createOscillator();
+        const g = context.createGain();
+        o.connect(g);
+        g.connect(context.destination);
+        o.type = 'sine';
+        o.frequency.setValueAtTime(880, context.currentTime);
+        g.gain.setValueAtTime(0.2, context.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.5);
+        o.start(context.currentTime);
+        o.stop(context.currentTime + 0.5);
+    }
+  }
+
   const startRecording = useCallback(async () => {
     if (isRecording) return;
-    setActiveToolCall(null);
+    setWorkspaceState({ mode: 'idle', content: null, message: '' });
     setIsRecording(true);
     addTurn({ speaker: 'system', text: 'Connecting...' });
 
@@ -225,160 +234,149 @@ export default function App() {
     const contextualSystemPrompt = constructSystemPromptWithMemory(settings.systemInstruction, conversation);
     const settingsForSession = { ...settings, systemInstruction: contextualSystemPrompt };
 
-    sessionPromiseRef.current = startLiveSession(settingsForSession, {
+    sessionPromiseRef.current = geminiService.startLiveSession(settingsForSession, {
       onopen: async () => {
+        playChime();
         addTurn({ speaker: 'system', text: 'Connection open. Start speaking.' });
         mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
         const source = inputAudioContextRef.current!.createMediaStreamSource(mediaStreamRef.current);
         scriptProcessorRef.current = inputAudioContextRef.current!.createScriptProcessor(4096, 1, 1);
         
-        scriptProcessorRef.current.onaudioprocess = (audioProcessingEvent) => {
-          const inputData = audioProcessingEvent.inputBuffer.getChannelData(0);
-          const l = inputData.length;
-          const int16 = new Int16Array(l);
-          for (let i = 0; i < l; i++) {
-            int16[i] = inputData[i] * 32768;
-          }
-
-          const pcmBlob: Blob = {
-            data: encode(new Uint8Array(int16.buffer)),
-            mimeType: 'audio/pcm;rate=16000',
-          };
-          if (sessionPromiseRef.current) {
-            sessionPromiseRef.current.then((session) => {
-              session.sendRealtimeInput({ media: pcmBlob });
-            });
-          }
+        scriptProcessorRef.current.onaudioprocess = (e) => {
+          const inputData = e.inputBuffer.getChannelData(0);
+          const pcmBlob: Blob = { data: encode(new Uint8Array(new Int16Array(inputData.map(f => f * 32768)).buffer)), mimeType: 'audio/pcm;rate=16000' };
+          sessionPromiseRef.current?.then((session) => session.sendRealtimeInput({ media: pcmBlob }));
         };
-        
         source.connect(scriptProcessorRef.current);
         scriptProcessorRef.current.connect(inputAudioContextRef.current!.destination);
       },
       onmessage: async (message: LiveServerMessage) => {
         if (message.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data) {
-          setIsSpeaking(true);
-          const base64Audio = message.serverContent.modelTurn.parts[0].inlineData.data;
-          const audioBuffer = await decodeAudioData(
-            decode(base64Audio),
-            outputAudioContextRef.current!,
-            24000,
-            1,
-          );
-          const source = outputAudioContextRef.current!.createBufferSource();
-          source.buffer = audioBuffer;
-          source.connect(outputAudioContextRef.current!.destination);
-
-          const currentTime = outputAudioContextRef.current!.currentTime;
-          nextStartTimeRef.current = Math.max(nextStartTimeRef.current, currentTime);
-          
-          source.start(nextStartTimeRef.current);
-          nextStartTimeRef.current += audioBuffer.duration;
-          audioSourcesRef.current.add(source);
-          source.onended = () => {
-            audioSourcesRef.current.delete(source);
-            if (audioSourcesRef.current.size === 0) {
-              setIsSpeaking(false);
-            }
-          };
+          playAudio(message.serverContent.modelTurn.parts[0].inlineData.data);
         }
-
-        if (message.serverContent?.interrupted) {
-          stopAudioPlayback();
-        }
-
-        if (message.serverContent?.inputTranscription) {
-            currentInputTranscriptionRef.current += message.serverContent.inputTranscription.text;
-        }
-
-        if (message.serverContent?.outputTranscription) {
-            currentOutputTranscriptionRef.current += message.serverContent.outputTranscription.text;
-        }
-
+        if (message.serverContent?.interrupted) stopAudioPlayback();
+        if (message.serverContent?.inputTranscription) currentInputTranscriptionRef.current += message.serverContent.inputTranscription.text;
+        if (message.serverContent?.outputTranscription) currentOutputTranscriptionRef.current += message.serverContent.outputTranscription.text;
         if (message.serverContent?.turnComplete) {
-            if (currentInputTranscriptionRef.current.trim()) {
-                addTurn({ speaker: 'user', text: currentInputTranscriptionRef.current.trim() });
-            }
-            if (currentOutputTranscriptionRef.current.trim()) {
-                addTurn({ speaker: 'model', text: currentOutputTranscriptionRef.current.trim() });
-            }
+            if (currentInputTranscriptionRef.current.trim()) addTurn({ speaker: 'user', text: currentInputTranscriptionRef.current.trim() });
+            if (currentOutputTranscriptionRef.current.trim()) addTurn({ speaker: 'model', text: currentOutputTranscriptionRef.current.trim() });
             currentInputTranscriptionRef.current = '';
             currentOutputTranscriptionRef.current = '';
-            setActiveToolCall(null);
         }
 
         if (message.toolCall) {
-            const firstCall = message.toolCall.functionCalls[0];
-            if (firstCall) {
-              setActiveToolCall({ name: firstCall.name, args: firstCall.args });
-            }
-            message.toolCall.functionCalls.forEach(fc => {
+            for (const fc of message.toolCall.functionCalls) {
                 addTurn({ speaker: 'system', text: `Tool call: ${fc.name}(${JSON.stringify(fc.args)})` });
-                // In a real app, you would execute the function here and send back the result.
-                // For this demo, we'll just send a generic success response.
-                const result = "ok";
-                sessionPromiseRef.current?.then(session => {
-                    session.sendToolResponse({
-                        functionResponses: { id: fc.id, name: fc.name, response: { result: result } }
-                    });
-                });
-            });
+                try {
+                  let result = "ok"; // Default result
+                  // --- TOOL EXECUTION LOGIC ---
+                  switch (fc.name) {
+                      case 'generateImage':
+                          setWorkspaceState({ mode: 'processing', message: 'Generating image...', content: null });
+                          // @ts-ignore
+                          const imageUrl = await geminiService.generateImage(String(fc.args.prompt), fc.args.aspectRatio);
+                          setWorkspaceState({ mode: 'result', content: { type: 'image', data: imageUrl, prompt: String(fc.args.prompt) }, message: '' });
+                          break;
+                      case 'analyzeImage':
+                      case 'editImage':
+                      case 'generateVideoFromImage':
+                          if (uploadedFileRef.current) {
+                            if (fc.name === 'analyzeImage') {
+                                setWorkspaceState({ mode: 'processing', message: 'Analyzing image...', content: null });
+                                const analysis = await geminiService.analyzeImage(uploadedFileRef.current.base64, uploadedFileRef.current.mimeType, String(fc.args.prompt));
+                                setWorkspaceState({ mode: 'result', content: { type: 'text', data: {text: analysis} }, message: '' });
+                            } else if (fc.name === 'editImage') {
+                                setWorkspaceState({ mode: 'processing', message: 'Editing image...', content: null });
+                                const editedUrl = await geminiService.editImage(uploadedFileRef.current.base64, uploadedFileRef.current.mimeType, String(fc.args.prompt));
+                                setWorkspaceState({ mode: 'result', content: { type: 'image', data: editedUrl }, message: '' });
+                            } else { // generateVideoFromImage
+                                 setWorkspaceState({ mode: 'processing', message: 'Starting video generation...', content: null });
+                                 try {
+                                    // @ts-ignore
+                                    const videoUrl = await geminiService.generateVideo(uploadedFileRef.current.base64, uploadedFileRef.current.mimeType, String(fc.args.prompt), fc.args.aspectRatio, (status) => setWorkspaceState(s => ({...s, message: status})));
+                                    setWorkspaceState({ mode: 'result', content: { type: 'video', data: videoUrl }, message: '' });
+                                 } catch (e) {
+                                    const errorMessage = e instanceof Error ? e.message : String(e);
+                                    if (e instanceof Error && e.message === 'API_KEY_REQUIRED') {
+                                        setWorkspaceState({ mode: 'api_key_needed', content: null, message: 'API key selection is required for video generation.'});
+                                    } else {
+                                        addTurn({ speaker: 'system', text: `Video generation error: ${errorMessage}`});
+                                        setWorkspaceState({ mode: 'idle', content: null, message: '' });
+                                    }
+                                    result = `Failed: ${errorMessage}`;
+                                 }
+                            }
+                          } else {
+                            result = "Sorry, I need an image to be uploaded first.";
+                            addTurn({ speaker: 'system', text: result });
+                          }
+                          break;
+                      case 'groundedSearch':
+                          setWorkspaceState({ mode: 'processing', message: 'Searching Google...', content: null });
+                          const searchRes = await geminiService.generateTextWithGoogleSearch(String(fc.args.query));
+                          const sources = searchRes.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.web) || [];
+                          setWorkspaceState({ mode: 'result', content: { type: 'grounding_search', data: { text: searchRes.text, sources } }, message: '' });
+                          playAudio(await geminiService.generateSpeech(String(searchRes.text)));
+                          break;
+                      case 'groundedMapSearch':
+                          setWorkspaceState({ mode: 'processing', message: 'Searching Google Maps...', content: null });
+                          const mapRes = await geminiService.generateTextWithGoogleMaps(String(fc.args.query));
+                          const mapSources = mapRes.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.maps) || [];
+                          setWorkspaceState({ mode: 'result', content: { type: 'grounding_maps', data: { text: mapRes.text, sources: mapSources } }, message: '' });
+                          playAudio(await geminiService.generateSpeech(String(mapRes.text)));
+                          break;
+                      case 'quickQuery':
+                          const quickText = await geminiService.generateLowLatencyText(String(fc.args.query));
+                          playAudio(await geminiService.generateSpeech(quickText));
+                          addTurn({ speaker: 'model', text: quickText });
+                          break;
+                      case 'speakText':
+                           playAudio(await geminiService.generateSpeech(String(fc.args.text)));
+                           break;
+                  }
+                  sessionPromiseRef.current?.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result } } }));
+                } catch(e) {
+                    const errorMessage = e instanceof Error ? e.message : String(e);
+                    console.error(`Tool call ${fc.name} failed:`, e);
+                    addTurn({ speaker: 'system', text: `Tool error: ${errorMessage}` });
+                    sessionPromiseRef.current?.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: `Error: ${errorMessage}` } } }));
+                    setWorkspaceState({ mode: 'idle', content: null, message: '' });
+                }
+            }
         }
 
       },
-      onerror: (err) => {
+      onerror: (err: ErrorEvent) => {
         console.error('Session error:', err);
         addTurn({ speaker: 'system', text: `Error: ${err.type}` });
         stopRecording();
       },
       onclose: () => {
         addTurn({ speaker: 'system', text: 'Connection closed.' });
-        stopRecording(false); // Don't try to close session again
+        stopRecording(false);
       },
     });
 
-  }, [isRecording, addTurn, settings, conversation]);
+  }, [isRecording, addTurn, settings, conversation, playAudio]);
 
   const stopRecording = useCallback(async (closeSession = true) => {
     if (!isRecording && !sessionPromiseRef.current) return;
-    
     if (closeSession && sessionPromiseRef.current) {
-      try {
-        const session = await sessionPromiseRef.current;
-        session.close();
-      } catch (e) {
-        console.error("Failed to close session gracefully:", e);
-      }
+      try { (await sessionPromiseRef.current).close(); } catch (e) {}
     }
-    
     scriptProcessorRef.current?.disconnect();
     scriptProcessorRef.current = null;
     mediaStreamRef.current?.getTracks().forEach(track => track.stop());
     mediaStreamRef.current = null;
-    
-    if (inputAudioContextRef.current?.state !== 'closed') {
-      inputAudioContextRef.current?.close().catch(console.error);
-    }
-    if (outputAudioContextRef.current?.state !== 'closed') {
-      outputAudioContextRef.current?.close().catch(console.error);
-    }
-
+    inputAudioContextRef.current?.close().catch(console.error);
+    outputAudioContextRef.current?.close().catch(console.error);
     stopAudioPlayback();
-    
     sessionPromiseRef.current = null;
-    setActiveToolCall(null);
     setIsRecording(false);
     setIsSpeaking(false);
   }, [isRecording]);
 
-  const handleToggleRecording = () => {
-    if (isRecording) {
-      // In this new UI, the mic button is a toggle, not a stop button.
-      // To stop the whole session, the user should press the 'X' button.
-      // We can implement mute functionality here later. For now, it does nothing if already recording.
-    } else {
-      startRecording();
-    }
-  };
+  const handleToggleRecording = () => isRecording ? stopRecording() : startRecording();
   
   const handleSaveSettings = (newSettings: AppSettings) => {
     setSettings(newSettings);
@@ -386,33 +384,64 @@ export default function App() {
     setIsSettingsOpen(false);
   };
   
-  useEffect(() => {
-    // Cleanup on unmount
-    return () => {
-      stopRecording();
-    };
-  }, [stopRecording]);
+  const handleShowActions = () => {
+    const action = window.prompt("What do you want to do? (analyze, edit, video)");
+    switch(action?.toLowerCase()) {
+      case 'analyze':
+        setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'analyzeImage' });
+        break;
+      case 'edit':
+        setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'editImage' });
+        break;
+      case 'video':
+        setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'generateVideo' });
+        break;
+      default:
+        setWorkspaceState({ mode: 'idle', content: null, message: '' });
+    }
+  };
+
+  const handleFileSelected = async (file: File) => {
+    setWorkspaceState(s => ({ ...s, mode: 'processing', message: 'Processing file...' }));
+    const { a, t } = await fileToBase64(file);
+    const url = URL.createObjectURL(file);
+    uploadedFileRef.current = { base64: a, mimeType: t, url: url };
+    setWorkspaceState(s => ({ ...s, mode: 'result', content: { type: 'image', data: url } }));
+  };
+  
+  const handlePromptSubmit = (prompt: string) => {
+    const action = workspaceState.uploadAction;
+    const session = sessionPromiseRef.current;
+    if (action && session) {
+        addTurn({ speaker: 'user', text: `[${action}] ${prompt}`});
+        session.then(s => s.sendTextInput({ text: `Use the ${action} tool. Prompt: ${prompt}` }));
+    }
+  }
+
+  useEffect(() => { return () => { stopRecording(); }; }, [stopRecording]);
 
   return (
     <div className="bg-black text-white h-screen w-screen overflow-hidden flex flex-col font-sans">
-      <TopBar 
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        onToggleCaptions={() => setShowCaptions(prev => !prev)}
-        isCaptionsOn={showCaptions}
-      />
-
+      <TopBar onOpenSettings={() => setIsSettingsOpen(true)} onToggleCaptions={() => setShowCaptions(prev => !prev)} isCaptionsOn={showCaptions} />
       <main className="flex-1 flex flex-col items-center justify-center relative">
         <VoiceVisualizer isRecording={isRecording} isSpeaking={isSpeaking} />
-        <Workspace activeToolCall={activeToolCall} />
+        <Workspace 
+          workspaceState={workspaceState} 
+          onFileSelect={handleFileSelected} 
+          onPromptSubmit={handlePromptSubmit} 
+          onClearWorkspace={() => {
+              setWorkspaceState({ mode: 'idle', content: null, message: '' });
+              uploadedFileRef.current = null;
+          }}
+          onSelectApiKey={async () => {
+              await window.aistudio.openSelectKey();
+              // Assume success and retry the last action by restarting the prompt.
+              setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'generateVideo'});
+          }}
+        />
         {showCaptions && <Captions conversation={conversation} />}
       </main>
-
-      <ControlBar
-        isRecording={isRecording}
-        onToggleRecording={handleToggleRecording}
-        onHangUp={() => stopRecording()}
-      />
-      
+      <ControlBar isRecording={isRecording} onToggleRecording={handleToggleRecording} onHangUp={() => stopRecording()} onShowActions={handleShowActions} />
       {isSettingsOpen && (
         <Settings
           initialSystemInstruction={settings.systemInstruction}

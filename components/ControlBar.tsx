@@ -1,32 +1,35 @@
 import React from 'react';
-import { MicrophoneIcon, VideoCameraSolidIcon, EllipsisHorizontalIcon, XMarkIcon } from './icons';
+import { MicrophoneIcon, SparklesIcon, EllipsisHorizontalIcon, XMarkIcon } from './icons';
 
 interface ControlBarProps {
   isRecording: boolean;
   onToggleRecording: () => void;
   onHangUp: () => void;
+  onShowActions: () => void;
 }
 
 export const ControlBar: React.FC<ControlBarProps> = ({
   isRecording,
   onToggleRecording,
   onHangUp,
+  onShowActions,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-center items-center z-20">
       <div className="flex items-center space-x-6">
-        {/* Video Button */}
+        {/* Actions Button */}
         <button
+          onClick={onShowActions}
           className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
-          aria-label="Toggle Camera"
+          aria-label="Show Actions"
         >
-          <VideoCameraSolidIcon className="w-8 h-8 text-white" />
+          <SparklesIcon className="w-8 h-8 text-white" />
         </button>
 
         {/* Microphone Button */}
         <button
           onClick={onToggleRecording}
-          className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
+          className={`w-16 h-16 rounded-full transition-colors flex items-center justify-center ${isRecording ? 'bg-blue-600 hover:bg-blue-700' : 'bg-neutral-800 hover:bg-neutral-700'}`}
           aria-label={isRecording ? 'Microphone is on' : 'Turn on microphone'}
         >
           <MicrophoneIcon className="w-8 h-8 text-white" />

@@ -7,6 +7,8 @@ export interface ConversationTurn {
 }
 
 export interface ServerSettings {
+  googleCloudProjectId: string;
+  googleCloudServiceAccountJson: string;
   twilioSid: string;
   twilioAuthToken: string;
   blandApiKey: string;
@@ -32,4 +34,25 @@ export interface Tool {
 export interface ActiveToolCall {
   name: string;
   args: any;
+}
+
+// Workspace State Types
+export type WorkspaceMode = 'idle' | 'upload' | 'processing' | 'result' | 'api_key_needed';
+
+export interface GroundingSource {
+  uri: string;
+  title: string;
+}
+
+export interface WorkspaceContent {
+  type: 'image' | 'video' | 'text' | 'grounding_search' | 'grounding_maps';
+  data: any; // URL for image/video, text string, or GroundingSource[]
+  prompt?: string; // Original prompt that generated the content
+}
+
+export interface WorkspaceState {
+  mode: WorkspaceMode;
+  content: WorkspaceContent | null;
+  message: string;
+  uploadAction?: 'analyzeImage' | 'editImage' | 'generateVideo';
 }
