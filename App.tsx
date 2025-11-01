@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LiveServerMessage, Blob as GenaiBlob } from '@google/genai';
 
-import { AppSettings, ConversationTurn, WorkspaceState } from './types';
+import { AppSettings, ConversationTurn, WorkspaceState, MediaAction, UploadAction } from './types';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { TopBar } from './components/TopBar';
 import { ControlBar } from './components/ControlBar';
@@ -447,7 +447,21 @@ function App() {
 
   const handleFileSelect = async (file: File) => {
     const action = workspaceState.uploadAction;
-    setWorkspaceState({ mode: 'result', content: { type: file.type.startsWith('image') ? 'image' : 'video', data: URL.createObjectURL(file), prompt: '' }, uploadAction: action, message: '' });
+    if (!action) return; // Should not happen if flow is correct
+    
+    const isAudio = file.type.startsWith('audio');
+    const isVideo = file.type.startsWith('video');
+    const isImage = file.type.startsWith('image');
+    
+    let contentType: 'image' | 'video' = 'image';
+    if (isVideo || isAudio) contentType = 'video'; // Use video player for audio too
+
+    setWorkspaceState({ 
+      mode: 'result', 
+      content: { type: contentType, data: URL.createObjectURL(file), prompt: '' }, 
+      uploadAction: action,
+      message: '' 
+    });
   };
   
   const handleWorkspacePrompt = async (prompt: string) => {
@@ -494,6 +508,15 @@ function App() {
       }
   };
 
+  const handleActionSelect = (action: MediaAction) => {
+    if (action === 'recordMedia') {
+      setWorkspaceState({ mode: 'recording', content: null, message: '' });
+    } else if (action === 'recordScreen') {
+      setWorkspaceState({ mode: 'screen_sharing_setup', content: null, message: '' });
+    } else {
+      setWorkspaceState({ mode: 'upload', uploadAction: action as UploadAction, content: null, message: '' });
+    }
+  };
 
   return (
     <main className="bg-black text-white w-screen h-screen overflow-hidden flex items-center justify-center font-sans">
@@ -509,7 +532,7 @@ function App() {
         isRecording={isRecording}
         onToggleRecording={handleToggleRecording}
         onHangUp={handleHangUp}
-        onShowActions={() => setWorkspaceState({ mode: 'upload', uploadAction: 'analyzeImage', content: null, message: '' })}
+        onShowActions={() => setWorkspaceState({ mode: 'action_select', content: null, message: 'Choose an action' })}
       />
       {showSettings && (
         <Settings
@@ -522,6 +545,7 @@ function App() {
       {workspaceState.mode !== 'idle' && (
         <Workspace
             workspaceState={workspaceState}
+            onActionSelect={handleActionSelect}
             onFileSelect={handleFileSelect}
             onPromptSubmit={handleWorkspacePrompt}
             onClearWorkspace={onClearWorkspace}
@@ -529,7 +553,9 @@ function App() {
             onSelectApiKey={async () => {
                 await (window as any).aistudio.openSelectKey();
                 // Assume success and retry
-                handleWorkspacePrompt(workspaceState.content?.prompt || '');
+                if (workspaceState.content?.prompt) {
+                  handleWorkspacePrompt(workspaceState.content.prompt);
+                }
             }}
         />
       )}

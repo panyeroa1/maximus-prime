@@ -1,8 +1,9 @@
 import React, { useRef, FormEvent, useState, useEffect } from 'react';
-import { WorkspaceState } from '../types';
+import { WorkspaceState, MediaAction } from '../types';
 
 interface WorkspaceProps {
   workspaceState: WorkspaceState;
+  onActionSelect: (action: MediaAction) => void;
   onFileSelect: (file: File) => void;
   onRecordingComplete: (file: File) => void;
   onPromptSubmit: (prompt: string) => void;
@@ -17,7 +18,38 @@ const LoadingSpinner: React.FC = () => (
   </svg>
 );
 
-const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction?: WorkspaceState['uploadAction'] }> = ({ onFileSelect, uploadAction }) => {
+const ActionSelector: React.FC<{ onSelect: (action: MediaAction) => void; onCancel: () => void }> = ({ onSelect, onCancel }) => {
+  const actions: { id: MediaAction, title: string, description: string }[] = [
+    { id: 'analyzeImage', title: 'Analyze Media', description: 'Upload an image or video for analysis.' },
+    { id: 'editImage', title: 'Edit Image', description: 'Upload an image to edit with a prompt.' },
+    { id: 'generateVideo', title: 'Generate Video', description: 'Use an image and prompt to create a video.' },
+    { id: 'transcribeAudio', title: 'Transcribe File', description: 'Upload an audio or video file for transcription.' },
+    { id: 'recordMedia', title: 'Record Camera', description: 'Use your camera to record a new video clip.' },
+    { id: 'recordScreen', title: 'Record Screen', description: 'Capture your screen with audio.' },
+  ];
+
+  return (
+    <div className="flex flex-col items-center">
+      <h3 className="text-xl font-semibold mb-4 text-center">Choose an Action</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-2xl">
+        {actions.map(action => (
+          <button
+            key={action.id}
+            onClick={() => onSelect(action.id)}
+            className="bg-neutral-800 hover:bg-neutral-700 p-4 rounded-lg text-left transition-colors"
+          >
+            <p className="font-semibold text-white">{action.title}</p>
+            <p className="text-sm text-neutral-400">{action.description}</p>
+          </button>
+        ))}
+      </div>
+       <button onClick={onCancel} className="mt-6 text-sm text-gray-400 hover:text-white">Cancel</button>
+    </div>
+  );
+};
+
+
+const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction: WorkspaceState['uploadAction'] }> = ({ onFileSelect, uploadAction }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -26,9 +58,9 @@ const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction?: Workspace
   };
   
   const isAudio = uploadAction === 'transcribeAudio';
-  const acceptType = isAudio ? 'audio/*' : 'image/*,video/*';
-  const title = isAudio ? 'Upload an Audio File' : 'Upload an Image or Video';
-  const description = isAudio ? 'Select an audio file to transcribe.' : 'Select a media file to analyze, edit, or generate a video from.';
+  const acceptType = isAudio ? 'audio/*,video/*' : 'image/*,video/*';
+  const title = isAudio ? 'Upload an Audio or Video File' : 'Upload an Image or Video';
+  const description = isAudio ? 'Select a file to transcribe.' : 'Select a media file to continue.';
 
   return (
     <div className="text-center">
@@ -296,13 +328,15 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
 };
 
 
-export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey, onRecordingComplete }) => {
+export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onActionSelect, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey, onRecordingComplete }) => {
   if (workspaceState.mode === 'idle') {
     return null;
   }
   
   const renderContent = () => {
     switch (workspaceState.mode) {
+      case 'action_select':
+        return <ActionSelector onSelect={onActionSelect} onCancel={onClearWorkspace} />;
       case 'api_key_needed':
         return (
           <div className="text-center">
