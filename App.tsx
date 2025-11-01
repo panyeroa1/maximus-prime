@@ -8,6 +8,7 @@ import { Captions } from './components/Captions';
 import { Settings } from './components/Settings';
 import { Workspace } from './components/Workspace';
 import * as geminiService from './services/geminiService';
+import * as subAgentService from './services/subAgentService';
 import { decode, decodeAudioData, encode } from './services/audioUtils';
 import { AppSettings, ConversationTurn, WorkspaceState } from './types';
 
@@ -142,7 +143,7 @@ export default function App() {
         return saved ? JSON.parse(saved) : {
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           voice: DEFAULT_VOICE,
-          enabledTools: ['groundedSearch', 'groundedMapSearch', 'generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage', 'quickQuery', 'speakText', 'generateCode', 'generateDocumentation', 'summarizeLongText', 'transcribeAudioFile'],
+          enabledTools: ['groundedSearch', 'groundedMapSearch', 'generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage', 'quickQuery', 'speakText', 'generateCode', 'generateDocumentation', 'summarizeLongText', 'transcribeAudioFile', 'useSubAgentLLM'],
           serverSettings: {
             googleCloudProjectId: '',
             googleCloudServiceAccountJson: '',
@@ -369,6 +370,20 @@ export default function App() {
                           result = "I've completed the analysis. You can see it in the workspace.";
                           break;
                       }
+                      case 'useSubAgentLLM': {
+                          setWorkspaceState({ mode: 'processing', message: `Contacting ${fc.args.provider}...`, content: null });
+                          // @ts-ignore
+                          const { provider, prompt, model } = fc.args;
+                          let subAgentResponse = '';
+                          if (provider === 'ollama') {
+                            subAgentResponse = await subAgentService.callOllama(String(prompt), String(model), settings.serverSettings);
+                          } else {
+                            subAgentResponse = `Provider "${provider}" is not supported.`;
+                          }
+                          setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: subAgentResponse } }, message: '' });
+                          result = `Sub-agent task complete. Response is in the workspace.`;
+                          break;
+                      }
                   }
                   sessionPromiseRef.current?.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result } } }));
                 } catch(e) {
@@ -421,7 +436,7 @@ export default function App() {
   };
   
   const handleShowActions = () => {
-    const action = window.prompt("What do you want to do? (analyze, edit, video, transcribe, record)");
+    const action = window.prompt("What do you want to do? (analyze, edit, video, transcribe, record, screen)");
     switch(action?.toLowerCase()) {
       case 'analyze':
         setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'analyzeImage' });
@@ -437,6 +452,9 @@ export default function App() {
         break;
       case 'record':
         setWorkspaceState({ mode: 'recording', content: null, message: '', uploadAction: 'recordMedia' });
+        break;
+      case 'screen':
+        setWorkspaceState({ mode: 'screen_sharing_setup', content: null, message: '', uploadAction: 'recordScreen' });
         break;
       default:
         setWorkspaceState({ mode: 'idle', content: null, message: '' });

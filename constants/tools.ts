@@ -194,4 +194,22 @@ export const ALL_TOOLS: Tool[] = [
       },
     },
   },
+  // Sub-Agents
+  {
+    name: 'useSubAgentLLM',
+    description: 'Delegate a task to a specialized sub-agent LLM provider like Ollama for specific requests.',
+    functionDeclaration: {
+        name: 'useSubAgentLLM',
+        description: 'Delegates a task to a different LLM provider (e.g., Ollama).',
+        parameters: {
+            type: Type.OBJECT,
+            properties: {
+                provider: { type: Type.STRING, description: 'The provider to use. Currently supported: "ollama".' },
+                prompt: { type: Type.STRING, description: 'The prompt to send to the sub-agent.' },
+                model: { type: Type.STRING, description: 'The specific model to use from the provider (e.g., "llama3").'}
+            },
+            required: ['provider', 'prompt', 'model'],
+        },
+    },
+  },
 ];

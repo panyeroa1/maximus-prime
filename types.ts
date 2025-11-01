@@ -37,7 +37,7 @@ export interface ActiveToolCall {
 }
 
 // Workspace State Types
-export type WorkspaceMode = 'idle' | 'upload' | 'processing' | 'result' | 'api_key_needed' | 'recording';
+export type WorkspaceMode = 'idle' | 'upload' | 'processing' | 'result' | 'api_key_needed' | 'recording' | 'screen_sharing_setup';
 
 export interface GroundingSource {
   uri: string;
@@ -54,5 +54,5 @@ export interface WorkspaceState {
   mode: WorkspaceMode;
   content: WorkspaceContent | null;
   message: string;
-  uploadAction?: 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'recordMedia';
+  uploadAction?: 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'recordMedia' | 'recordScreen';
 }

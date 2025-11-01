@@ -73,6 +73,7 @@ export const Settings: React.FC<SettingsProps> = ({
     'Media Generation & Editing': ['generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage'],
     'Audio': ['speakText', 'transcribeAudioFile'],
     'Developer & Productivity': ['generateCode', 'generateDocumentation', 'summarizeLongText'],
+    'Sub-Agents': ['useSubAgentLLM'],
   };
 
   const getCategoryForTool = (toolName: string): string => {
@@ -253,7 +254,7 @@ export const Settings: React.FC<SettingsProps> = ({
                      <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Ollama Cloud Endpoint URL</label>
-                            <input name="ollamaCloudEndpoint" value={serverSettings.ollamaCloudEndpoint} onChange={handleServerSettingChange} placeholder="e.g., https://api.ollama.cloud" className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                            <input name="ollamaCloudEndpoint" value={serverSettings.ollamaCloudEndpoint} onChange={handleServerSettingChange} placeholder="e.g., https://api.ollama.cloud/v1/chat/completions" className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-300 mb-2">Ollama Cloud API Key</label>

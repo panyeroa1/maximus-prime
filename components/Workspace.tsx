@@ -11,7 +11,7 @@ interface WorkspaceProps {
 }
 
 const LoadingSpinner: React.FC = () => (
-  <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+  <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
@@ -26,9 +26,9 @@ const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction?: Workspace
   };
   
   const isAudio = uploadAction === 'transcribeAudio';
-  const acceptType = isAudio ? 'audio/*' : 'image/*';
-  const title = isAudio ? 'Upload an Audio File' : 'Upload an Image';
-  const description = isAudio ? 'Select an audio file to transcribe.' : 'Select an image to analyze, edit, or generate a video from.';
+  const acceptType = isAudio ? 'audio/*' : 'image/*,video/*';
+  const title = isAudio ? 'Upload an Audio File' : 'Upload an Image or Video';
+  const description = isAudio ? 'Select an audio file to transcribe.' : 'Select a media file to analyze, edit, or generate a video from.';
 
   return (
     <div className="text-center">
@@ -114,7 +114,7 @@ const RecordingView: React.FC<{ onRecordingComplete: (file: File) => void, onCan
 
     return (
         <div className="flex flex-col items-center">
-            <h3 className="text-xl font-semibold mb-4">Record Media</h3>
+            <h3 className="text-xl font-semibold mb-4">Record Camera</h3>
             <video ref={videoRef} muted className={`w-full max-w-md rounded-lg bg-black mb-4 ${status === 'finished' && 'hidden'}`} />
             {recordedVideoUrl && status === 'finished' && (
                 <video src={recordedVideoUrl} controls autoPlay className="w-full max-w-md rounded-lg bg-black mb-4" />
@@ -124,7 +124,7 @@ const RecordingView: React.FC<{ onRecordingComplete: (file: File) => void, onCan
                 {status === 'recording' && <button onClick={handleStopRecording} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Stop Recording</button>}
                 {status === 'finished' && (
                     <>
-                        <button onClick={handleStartRecording} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Record Again</button>
+                        <button onClick={() => setStatus('idle')} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Record Again</button>
                         <button onClick={handleUseRecording} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md">Use Recording</button>
                     </>
                 )}
@@ -132,6 +132,110 @@ const RecordingView: React.FC<{ onRecordingComplete: (file: File) => void, onCan
             </div>
         </div>
     )
+};
+
+const ScreenShareView: React.FC<{ onRecordingComplete: (file: File) => void, onCancel: () => void }> = ({ onRecordingComplete, onCancel }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
+    const combinedStreamRef = useRef<MediaStream | null>(null);
+
+    const [status, setStatus] = useState<'permission' | 'idle' | 'recording' | 'finished'>('permission');
+    const [error, setError] = useState<string | null>(null);
+    const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        const setup = async () => {
+            let screenStream: MediaStream | null = null;
+            let audioStream: MediaStream | null = null;
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" } as any, audio: true });
+                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const combined = new MediaStream([
+                    ...screenStream.getVideoTracks(),
+                    ...screenStream.getAudioTracks(),
+                    ...audioStream.getAudioTracks()
+                ]);
+                combinedStreamRef.current = combined;
+
+                if (videoRef.current) {
+                    videoRef.current.srcObject = combined;
+                    videoRef.current.play().catch(console.error);
+                }
+                setStatus('idle');
+                
+                screenStream.getVideoTracks()[0].onended = () => {
+                    if (mediaRecorderRef.current?.state === 'recording') {
+                        mediaRecorderRef.current.stop();
+                    }
+                    if (status !== 'finished') onCancel();
+                };
+            } catch (err) {
+                console.error("Error accessing screen share.", err);
+                setError("Could not access screen sharing. Please check permissions and try again.");
+                setStatus('idle');
+            }
+        };
+
+        setup();
+        return () => combinedStreamRef.current?.getTracks().forEach(track => track.stop());
+    }, []);
+
+    const handleStartRecording = () => {
+        if (!combinedStreamRef.current) return;
+        recordedChunksRef.current = [];
+        mediaRecorderRef.current = new MediaRecorder(combinedStreamRef.current, { mimeType: 'video/webm' });
+        mediaRecorderRef.current.ondataavailable = (event) => {
+            if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+        };
+        mediaRecorderRef.current.onstop = () => {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            setRecordedVideoUrl(URL.createObjectURL(blob));
+            setStatus('finished');
+        };
+        mediaRecorderRef.current.start();
+        setStatus('recording');
+    };
+
+    const handleStopRecording = () => mediaRecorderRef.current?.stop();
+    
+    const handleUseRecording = () => {
+        if (!recordedVideoUrl) return;
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const file = new File([blob], `screenshare-${Date.now()}.webm`, { type: 'video/webm' });
+        onRecordingComplete(file);
+    };
+
+    if (error) {
+        return <div className="text-center text-red-400">
+            <p className="font-semibold">Permission Error</p>
+            <p>{error}</p>
+            <button onClick={onCancel} className="mt-4 text-sm text-gray-400 hover:text-white">Close</button>
+        </div>;
+    }
+
+    return (
+        <div className="flex flex-col items-center">
+            <h3 className="text-xl font-semibold mb-4">Record Screen</h3>
+            <video ref={videoRef} muted className={`w-full max-w-2xl rounded-lg bg-black mb-4 ${status === 'finished' && 'hidden'}`} />
+            {recordedVideoUrl && status === 'finished' && (
+                <video src={recordedVideoUrl} controls autoPlay className="w-full max-w-2xl rounded-lg bg-black mb-4" />
+            )}
+            <div className="flex items-center gap-4">
+                {status === 'permission' && <p>Requesting permissions...</p>}
+                {status === 'idle' && <button onClick={handleStartRecording} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-md">Start Recording</button>}
+                {status === 'recording' && <button onClick={handleStopRecording} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Stop Recording</button>}
+                {status === 'finished' && (
+                    <>
+                        <button onClick={onCancel} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Record Again</button>
+                        <button onClick={handleUseRecording} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md">Use Recording</button>
+                    </>
+                )}
+                {status !== 'permission' && <button onClick={onCancel} className="text-sm text-gray-400 hover:text-white">Cancel</button>}
+            </div>
+        </div>
+    );
 };
 
 
@@ -214,6 +318,8 @@ export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onFileSele
         return <UploadBox onFileSelect={onFileSelect} uploadAction={workspaceState.uploadAction} />;
       case 'recording':
         return <RecordingView onRecordingComplete={onRecordingComplete} onCancel={onClearWorkspace} />;
+      case 'screen_sharing_setup':
+        return <ScreenShareView onRecordingComplete={onRecordingComplete} onCancel={onClearWorkspace} />;
       case 'processing':
         return (
           <div className="flex flex-col items-center space-y-3">
