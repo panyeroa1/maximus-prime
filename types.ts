@@ -17,8 +17,7 @@ export interface ServerSettings {
 }
 
 export interface AppSettings {
-  role: string;
-  instructions: string;
+  systemInstruction: string;
   voice: string;
   enabledTools: string[];
   serverSettings: ServerSettings;

@@ -1,23 +1,16 @@
 import React, { useState } from 'react';
 import { ALL_TOOLS } from '../constants/tools';
-import { ServerSettings } from '../types';
+import { AppSettings, ServerSettings } from '../types';
 import { ServerIcon } from './icons';
 
-const PREBUILT_VOICES = ['Charon', 'Zephyr', 'Puck', 'Kore', 'Fenrir'];
+const PREBUILT_VOICES = ['Orus', 'Charon', 'Zephyr', 'Puck', 'Kore', 'Fenrir'];
 
 interface SettingsProps {
-  initialRole: string;
-  initialInstructions: string;
+  initialSystemInstruction: string;
   initialVoice: string;
   initialEnabledTools: string[];
   initialServerSettings: ServerSettings;
-  onSave: (newSettings: {
-    role: string;
-    instructions: string;
-    voice: string;
-    enabledTools: string[];
-    serverSettings: ServerSettings;
-  }) => void;
+  onSave: (newSettings: AppSettings) => void;
   onCancel: () => void;
 }
 
@@ -40,16 +33,14 @@ const ToggleSwitch: React.FC<{
 
 
 export const Settings: React.FC<SettingsProps> = ({
-  initialRole,
-  initialInstructions,
+  initialSystemInstruction,
   initialVoice,
   initialEnabledTools,
   initialServerSettings,
   onSave,
   onCancel,
 }) => {
-  const [role, setRole] = useState(initialRole);
-  const [instructions, setInstructions] = useState(initialInstructions);
+  const [systemInstruction, setSystemInstruction] = useState(initialSystemInstruction);
   const [voice, setVoice] = useState(initialVoice);
   const [enabledTools, setEnabledTools] = useState<Set<string>>(new Set(initialEnabledTools));
   const [serverSettings, setServerSettings] = useState<ServerSettings>(initialServerSettings);
@@ -74,7 +65,7 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   const handleSaveChanges = () => {
-    onSave({ role, instructions, voice, enabledTools: Array.from(enabledTools), serverSettings });
+    onSave({ systemInstruction, voice, enabledTools: Array.from(enabledTools), serverSettings });
   };
 
   const toolCategories = {
@@ -124,44 +115,9 @@ export const Settings: React.FC<SettingsProps> = ({
           <div className="animate-fade-in">
             {/* Persona Section */}
             <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6 text-blue-400">Persona Customization</h2>
+              <h2 className="text-2xl font-semibold mb-6 text-blue-400">Persona & Voice</h2>
               <div className="space-y-6">
-                <div>
-                  <label htmlFor="role-input" className="block text-sm font-medium text-gray-300 mb-2">
-                    Role
-                  </label>
-                  <input
-                    id="role-input"
-                    type="text"
-                    value={role}
-                    onChange={(e) => setRole(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="e.g., a witty science tutor"
-                  />
-                  <p className="text-xs text-gray-500 mt-2">Define the core role of Maximus. This is prefixed with "You are Maximus, ...".</p>
-                </div>
-                <div>
-                  <label htmlFor="instructions-textarea" className="block text-sm font-medium text-gray-300 mb-2">
-                    Instructions
-                  </label>
-                  <textarea
-                    id="instructions-textarea"
-                    rows={10}
-                    value={instructions}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
-                    placeholder="e.g., Always answer in the form of a haiku."
-                  />
-                  <p className="text-xs text-gray-500 mt-2">Provide specific instructions on how Maximus should behave, its personality, and what it should or shouldn't do.</p>
-                </div>
-              </div>
-            </section>
-
-            {/* Voice Section */}
-            <section className="mb-12">
-              <h2 className="text-2xl font-semibold mb-6 text-blue-400">Voice Settings</h2>
-              <div className="space-y-6">
-                <div>
+                 <div>
                   <label htmlFor="voice-select" className="block text-sm font-medium text-gray-300 mb-2">
                     Voice Persona
                   </label>
@@ -177,6 +133,20 @@ export const Settings: React.FC<SettingsProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+                <div>
+                  <label htmlFor="instructions-textarea" className="block text-sm font-medium text-gray-300 mb-2">
+                    System Prompt
+                  </label>
+                  <textarea
+                    id="instructions-textarea"
+                    rows={20}
+                    value={systemInstruction}
+                    onChange={(e) => setSystemInstruction(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+                    placeholder="Enter the full system prompt for the AI..."
+                  />
+                  <p className="text-xs text-gray-500 mt-2">This is the core prompt that defines the AI's role, personality, rules, and output format.</p>
                 </div>
               </div>
             </section>

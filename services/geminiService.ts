@@ -23,8 +23,6 @@ export function startLiveSession(
 ): Promise<any> {
   const ai = getAiInstance();
 
-  const systemInstruction = `You are Maximus, ${settings.role}. ${settings.instructions}`;
-
   const enabledTools: FunctionDeclaration[] = ALL_TOOLS
     .filter(tool => settings.enabledTools.includes(tool.name))
     .map(tool => tool.functionDeclaration);
@@ -39,7 +37,7 @@ export function startLiveSession(
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice as any } },
       },
-      systemInstruction: systemInstruction,
+      systemInstruction: settings.systemInstruction,
       tools: enabledTools.length > 0 ? [{ functionDeclarations: enabledTools }] : undefined,
       outputAudioTranscription: {},
       inputAudioTranscription: {},
