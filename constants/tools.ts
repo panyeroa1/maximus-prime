@@ -129,4 +129,69 @@ export const ALL_TOOLS: Tool[] = [
       },
     },
   },
+  {
+    name: 'transcribeAudioFile',
+    description: 'Transcribe the speech from an uploaded audio file into text.',
+    functionDeclaration: {
+      name: 'transcribeAudioFile',
+      description: 'Transcribes an audio file that the user has uploaded.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          prompt: { type: Type.STRING, description: 'An optional prompt to guide the transcription, e.g., specifying language or context. Default is "Transcribe the following audio."' },
+        },
+        required: [],
+      },
+    },
+  },
+  
+  // Developer & Productivity
+  {
+    name: 'generateCode',
+    description: 'Generate code in various programming languages based on a description.',
+    functionDeclaration: {
+      name: 'generateCode',
+      description: 'Writes code based on a user\'s request.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          language: { type: Type.STRING, description: 'The programming language for the code (e.g., "python", "javascript").' },
+          description: { type: Type.STRING, description: 'A detailed description of the code to generate.' },
+        },
+        required: ['language', 'description'],
+      },
+    },
+  },
+  {
+    name: 'generateDocumentation',
+    description: 'Generate documentation for a given piece of code.',
+    functionDeclaration: {
+      name: 'generateDocumentation',
+      description: 'Writes documentation (e.g., docstrings, comments, README) for a block of code.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          code: { type: Type.STRING, description: 'The code block that needs documentation.' },
+          format: { type: Type.STRING, description: 'The desired documentation format (e.g., "JSDoc", "Python docstrings", "Markdown").' },
+        },
+        required: ['code', 'format'],
+      },
+    },
+  },
+  {
+    name: 'summarizeLongText',
+    description: 'Summarize or analyze a long piece of text or document.',
+    functionDeclaration: {
+      name: 'summarizeLongText',
+      description: 'Processes a long document or text and provides a summary or analysis.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          text: { type: Type.STRING, description: 'The long text or document content to process.' },
+          request: { type: Type.STRING, description: 'What to do with the text (e.g., "summarize", "list key points", "find all action items").' },
+        },
+        required: ['text', 'request'],
+      },
+    },
+  },
 ];

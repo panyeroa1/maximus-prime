@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LiveServerMessage, Blob } from '@google/genai';
 import { TopBar } from './components/TopBar';
@@ -141,7 +142,7 @@ export default function App() {
         return saved ? JSON.parse(saved) : {
           systemInstruction: DEFAULT_SYSTEM_INSTRUCTION,
           voice: DEFAULT_VOICE,
-          enabledTools: ['groundedSearch', 'groundedMapSearch', 'generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage', 'quickQuery', 'speakText'],
+          enabledTools: ['groundedSearch', 'groundedMapSearch', 'generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage', 'quickQuery', 'speakText', 'generateCode', 'generateDocumentation', 'summarizeLongText', 'transcribeAudioFile'],
           serverSettings: {
             googleCloudProjectId: '',
             googleCloudServiceAccountJson: '',
@@ -280,6 +281,7 @@ export default function App() {
                       case 'analyzeImage':
                       case 'editImage':
                       case 'generateVideoFromImage':
+                      case 'transcribeAudioFile':
                           if (uploadedFileRef.current) {
                             if (fc.name === 'analyzeImage') {
                                 setWorkspaceState({ mode: 'processing', message: 'Analyzing image...', content: null });
@@ -289,6 +291,12 @@ export default function App() {
                                 setWorkspaceState({ mode: 'processing', message: 'Editing image...', content: null });
                                 const editedUrl = await geminiService.editImage(uploadedFileRef.current.base64, uploadedFileRef.current.mimeType, String(fc.args.prompt));
                                 setWorkspaceState({ mode: 'result', content: { type: 'image', data: editedUrl }, message: '' });
+                            } else if (fc.name === 'transcribeAudioFile') {
+                                setWorkspaceState({ mode: 'processing', message: 'Transcribing audio...', content: null });
+                                // @ts-ignore
+                                const transcript = await geminiService.transcribeAudio(uploadedFileRef.current.base64, uploadedFileRef.current.mimeType, String(fc.args.prompt || 'Transcribe the audio.'));
+                                setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: transcript } }, message: '' });
+                                result = "Transcription complete. Displayed in the workspace.";
                             } else { // generateVideoFromImage
                                  setWorkspaceState({ mode: 'processing', message: 'Starting video generation...', content: null });
                                  try {
@@ -307,7 +315,7 @@ export default function App() {
                                  }
                             }
                           } else {
-                            result = "Sorry, I need an image to be uploaded first.";
+                            result = `Sorry, I need a file to be uploaded first for the ${fc.name} tool.`;
                             addTurn({ speaker: 'system', text: result });
                           }
                           break;
@@ -333,6 +341,34 @@ export default function App() {
                       case 'speakText':
                            playAudio(await geminiService.generateSpeech(String(fc.args.text)));
                            break;
+                      case 'generateCode': {
+                          setWorkspaceState({ mode: 'processing', message: 'Generating code...', content: null });
+                          // @ts-ignore
+                          const prompt = `Language: ${fc.args.language}. Request: ${fc.args.description}`;
+                          const code = await geminiService.generateProText(prompt);
+                          // @ts-ignore
+                          setWorkspaceState({ mode: 'result', content: { type: 'code', data: { text: code, language: fc.args.language } }, message: '' });
+                          result = "I've generated the code and displayed it in the workspace.";
+                          break;
+                      }
+                      case 'generateDocumentation': {
+                          setWorkspaceState({ mode: 'processing', message: 'Generating documentation...', content: null });
+                          // @ts-ignore
+                          const prompt = `Generate ${fc.args.format} documentation for the following code:\n\n${fc.args.code}`;
+                          const docs = await geminiService.generateProText(prompt);
+                          setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: docs } }, message: '' });
+                          result = "Documentation generated and displayed in the workspace.";
+                          break;
+                      }
+                      case 'summarizeLongText': {
+                          setWorkspaceState({ mode: 'processing', message: 'Analyzing text...', content: null });
+                          // @ts-ignore
+                          const prompt = `Request: ${fc.args.request}\n\nText:\n${fc.args.text}`;
+                          const analysis = await geminiService.generateProText(prompt);
+                          setWorkspaceState({ mode: 'result', content: { type: 'text', data: { text: analysis } }, message: '' });
+                          result = "I've completed the analysis. You can see it in the workspace.";
+                          break;
+                      }
                   }
                   sessionPromiseRef.current?.then(session => session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result } } }));
                 } catch(e) {
@@ -385,7 +421,7 @@ export default function App() {
   };
   
   const handleShowActions = () => {
-    const action = window.prompt("What do you want to do? (analyze, edit, video)");
+    const action = window.prompt("What do you want to do? (analyze, edit, video, transcribe, record)");
     switch(action?.toLowerCase()) {
       case 'analyze':
         setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'analyzeImage' });
@@ -396,25 +432,52 @@ export default function App() {
       case 'video':
         setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'generateVideo' });
         break;
+      case 'transcribe':
+        setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: 'transcribeAudio' });
+        break;
+      case 'record':
+        setWorkspaceState({ mode: 'recording', content: null, message: '', uploadAction: 'recordMedia' });
+        break;
       default:
         setWorkspaceState({ mode: 'idle', content: null, message: '' });
     }
   };
 
-  const handleFileSelected = async (file: File) => {
+  const processFileForWorkspace = async (file: File) => {
     setWorkspaceState(s => ({ ...s, mode: 'processing', message: 'Processing file...' }));
     const { a, t } = await fileToBase64(file);
     const url = URL.createObjectURL(file);
     uploadedFileRef.current = { base64: a, mimeType: t, url: url };
-    setWorkspaceState(s => ({ ...s, mode: 'result', content: { type: 'image', data: url } }));
+    
+    if (file.type.startsWith('audio/')) {
+        // FIX: Add missing 'message' property to satisfy WorkspaceState type.
+        setWorkspaceState({ mode: 'result', uploadAction: 'transcribeAudio', message: '', content: {type: 'text', data: {text: `Ready to transcribe ${file.name}. Add instructions below or ask verbally.`}}});
+    } else { // assume video or image
+        // FIX: Add missing 'message' property to satisfy WorkspaceState type.
+        setWorkspaceState({ mode: 'result', uploadAction: 'analyzeImage', message: '', content: { type: 'video', data: url } });
+    }
+  }
+
+  const handleFileSelected = (file: File) => {
+    processFileForWorkspace(file);
   };
+
+  const handleRecordingComplete = (file: File) => {
+    processFileForWorkspace(file);
+  }
   
   const handlePromptSubmit = (prompt: string) => {
     const action = workspaceState.uploadAction;
     const session = sessionPromiseRef.current;
     if (action && session) {
+        let toolName = '';
+        if (action === 'generateVideo') toolName = 'generateVideoFromImage';
+        if (action === 'analyzeImage') toolName = 'analyzeImage';
+        if (action === 'editImage') toolName = 'editImage';
+        if (action === 'transcribeAudio') toolName = 'transcribeAudioFile';
+        
         addTurn({ speaker: 'user', text: `[${action}] ${prompt}`});
-        session.then(s => s.sendTextInput({ text: `Use the ${action} tool. Prompt: ${prompt}` }));
+        session.then(s => s.sendTextInput({ text: `Use the ${toolName} tool. Prompt: ${prompt}` }));
     }
   }
 
@@ -428,6 +491,7 @@ export default function App() {
         <Workspace 
           workspaceState={workspaceState} 
           onFileSelect={handleFileSelected} 
+          onRecordingComplete={handleRecordingComplete}
           onPromptSubmit={handlePromptSubmit} 
           onClearWorkspace={() => {
               setWorkspaceState({ mode: 'idle', content: null, message: '' });

@@ -201,3 +201,26 @@ export async function generateSpeech(text: string): Promise<string> {
     }
     return base64Audio;
 }
+
+// Complex Text Generation (for Code, Docs, etc.)
+export async function generateProText(prompt: string): Promise<string> {
+    const ai = getAiInstance();
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-pro',
+        contents: prompt,
+    });
+    return response.text;
+}
+
+// Audio Transcription
+export async function transcribeAudio(audioBase64: string, mimeType: string, prompt: string): Promise<string> {
+    const ai = getAiInstance();
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: { parts: [
+            { inlineData: { data: audioBase64, mimeType } },
+            { text: prompt },
+        ] },
+    });
+    return response.text;
+}

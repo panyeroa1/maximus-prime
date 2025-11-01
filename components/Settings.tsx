@@ -71,7 +71,8 @@ export const Settings: React.FC<SettingsProps> = ({
   const toolCategories = {
     'Core & Grounding': ['groundedSearch', 'groundedMapSearch', 'quickQuery'],
     'Media Generation & Editing': ['generateImage', 'analyzeImage', 'editImage', 'generateVideoFromImage'],
-    'Audio': ['speakText'],
+    'Audio': ['speakText', 'transcribeAudioFile'],
+    'Developer & Productivity': ['generateCode', 'generateDocumentation', 'summarizeLongText'],
   };
 
   const getCategoryForTool = (toolName: string): string => {

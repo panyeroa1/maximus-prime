@@ -37,7 +37,7 @@ export interface ActiveToolCall {
 }
 
 // Workspace State Types
-export type WorkspaceMode = 'idle' | 'upload' | 'processing' | 'result' | 'api_key_needed';
+export type WorkspaceMode = 'idle' | 'upload' | 'processing' | 'result' | 'api_key_needed' | 'recording';
 
 export interface GroundingSource {
   uri: string;
@@ -45,8 +45,8 @@ export interface GroundingSource {
 }
 
 export interface WorkspaceContent {
-  type: 'image' | 'video' | 'text' | 'grounding_search' | 'grounding_maps';
-  data: any; // URL for image/video, text string, or GroundingSource[]
+  type: 'image' | 'video' | 'text' | 'grounding_search' | 'grounding_maps' | 'code';
+  data: any; // URL for image/video, text string, GroundingSource[], or { text: string; language: string } for code
   prompt?: string; // Original prompt that generated the content
 }
 
@@ -54,5 +54,5 @@ export interface WorkspaceState {
   mode: WorkspaceMode;
   content: WorkspaceContent | null;
   message: string;
-  uploadAction?: 'analyzeImage' | 'editImage' | 'generateVideo';
+  uploadAction?: 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'recordMedia';
 }

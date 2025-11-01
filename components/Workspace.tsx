@@ -1,39 +1,139 @@
-import React, { useRef, FormEvent } from 'react';
+import React, { useRef, FormEvent, useState, useEffect } from 'react';
 import { WorkspaceState } from '../types';
 
 interface WorkspaceProps {
   workspaceState: WorkspaceState;
   onFileSelect: (file: File) => void;
+  onRecordingComplete: (file: File) => void;
   onPromptSubmit: (prompt: string) => void;
   onClearWorkspace: () => void;
   onSelectApiKey: () => void;
 }
 
 const LoadingSpinner: React.FC = () => (
-  <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+  <svg className="animate-spin h-6 w-6 text-white" xmlns="http://www.w.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
   </svg>
 );
 
-const UploadBox: React.FC<{ onFileSelect: (file: File) }> = ({ onFileSelect }) => {
+const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction?: WorkspaceState['uploadAction'] }> = ({ onFileSelect, uploadAction }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       onFileSelect(event.target.files[0]);
     }
   };
+  
+  const isAudio = uploadAction === 'transcribeAudio';
+  const acceptType = isAudio ? 'audio/*' : 'image/*';
+  const title = isAudio ? 'Upload an Audio File' : 'Upload an Image';
+  const description = isAudio ? 'Select an audio file to transcribe.' : 'Select an image to analyze, edit, or generate a video from.';
+
   return (
     <div className="text-center">
-      <h3 className="text-xl font-semibold mb-2">Upload an Image</h3>
-      <p className="text-gray-400 mb-4">Select an image to analyze, edit, or generate a video from.</p>
-      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+      <h3 className="text-xl font-semibold mb-2">{title}</h3>
+      <p className="text-gray-400 mb-4">{description}</p>
+      <input type="file" ref={fileInputRef} onChange={handleFileChange} accept={acceptType} className="hidden" />
       <button onClick={() => fileInputRef.current?.click()} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md transition-colors">
         Choose File
       </button>
     </div>
   );
 };
+
+const RecordingView: React.FC<{ onRecordingComplete: (file: File) => void, onCancel: () => void }> = ({ onRecordingComplete, onCancel }) => {
+    const videoRef = useRef<HTMLVideoElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const recordedChunksRef = useRef<Blob[]>([]);
+
+    const [status, setStatus] = useState<'idle' | 'permission' | 'recording' | 'finished'>('idle');
+    const [error, setError] = useState<string | null>(null);
+    const [recordedVideoUrl, setRecordedVideoUrl] = useState<string | null>(null);
+    
+    useEffect(() => {
+        let stream: MediaStream | null = null;
+        const setup = async () => {
+            try {
+                setStatus('permission');
+                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                if (videoRef.current) {
+                    videoRef.current.srcObject = stream;
+                    videoRef.current.play().catch(e => console.error("Autoplay failed:", e));
+                }
+                setStatus('idle');
+            } catch (err) {
+                console.error("Error accessing media devices.", err);
+                setError("Could not access camera and microphone. Please check permissions.");
+            }
+        };
+        setup();
+        return () => {
+            stream?.getTracks().forEach(track => track.stop());
+        };
+    }, []);
+
+    const handleStartRecording = () => {
+        if (!videoRef.current?.srcObject) return;
+        recordedChunksRef.current = [];
+        const stream = videoRef.current.srcObject as MediaStream;
+        mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'video/webm' });
+        mediaRecorderRef.current.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                recordedChunksRef.current.push(event.data);
+            }
+        };
+        mediaRecorderRef.current.onstop = () => {
+            const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+            const url = URL.createObjectURL(blob);
+            setRecordedVideoUrl(url);
+            setStatus('finished');
+        };
+        mediaRecorderRef.current.start();
+        setStatus('recording');
+    };
+
+    const handleStopRecording = () => {
+        mediaRecorderRef.current?.stop();
+    };
+    
+    const handleUseRecording = () => {
+        if (!recordedVideoUrl) return;
+        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const file = new File([blob], `recording-${Date.now()}.webm`, { type: 'video/webm' });
+        onRecordingComplete(file);
+    };
+
+    if (error) {
+        return <div className="text-center text-red-400">
+            <p className="font-semibold">Permission Error</p>
+            <p>{error}</p>
+            <button onClick={onCancel} className="mt-4 text-sm text-gray-400 hover:text-white">Close</button>
+        </div>
+    }
+
+    return (
+        <div className="flex flex-col items-center">
+            <h3 className="text-xl font-semibold mb-4">Record Media</h3>
+            <video ref={videoRef} muted className={`w-full max-w-md rounded-lg bg-black mb-4 ${status === 'finished' && 'hidden'}`} />
+            {recordedVideoUrl && status === 'finished' && (
+                <video src={recordedVideoUrl} controls autoPlay className="w-full max-w-md rounded-lg bg-black mb-4" />
+            )}
+            <div className="flex items-center gap-4">
+                {status === 'idle' && <button onClick={handleStartRecording} className="bg-red-600 hover:bg-red-500 text-white font-bold py-2 px-6 rounded-md">Start Recording</button>}
+                {status === 'recording' && <button onClick={handleStopRecording} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Stop Recording</button>}
+                {status === 'finished' && (
+                    <>
+                        <button onClick={handleStartRecording} className="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-md">Record Again</button>
+                        <button onClick={handleUseRecording} className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-6 rounded-md">Use Recording</button>
+                    </>
+                )}
+                <button onClick={onCancel} className="text-sm text-gray-400 hover:text-white">Cancel</button>
+            </div>
+        </div>
+    )
+};
+
 
 const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: string) => void, onClear: () => void }> = ({ state, onPromptSubmit, onClear }) => {
     const promptInputRef = useRef<HTMLInputElement>(null);
@@ -42,6 +142,7 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
         e.preventDefault();
         if (promptInputRef.current?.value) {
             onPromptSubmit(promptInputRef.current.value);
+            if (promptInputRef.current) promptInputRef.current.value = '';
         }
     };
     
@@ -53,6 +154,13 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
             {content.type === 'image' && <img src={content.data} alt="Generated content" className="max-w-full max-h-80 rounded-lg shadow-lg mb-4" />}
             {content.type === 'video' && <video src={content.data} controls autoPlay muted className="max-w-full max-h-80 rounded-lg shadow-lg mb-4" />}
             
+            {content.type === 'code' && (
+              <div className="bg-gray-900/80 p-4 rounded-lg text-left w-full max-h-60 overflow-y-auto mb-4 font-mono text-sm">
+                <h4 className="font-semibold text-xs text-gray-400 mb-2 uppercase">{content.data.language}</h4>
+                <pre className="whitespace-pre-wrap"><code>{content.data.text}</code></pre>
+              </div>
+            )}
+
             {(content.type === 'text' || content.type === 'grounding_search' || content.type === 'grounding_maps') && (
               <div className="bg-gray-900/80 p-4 rounded-lg text-left w-full max-h-60 overflow-y-auto mb-4">
                 <p className="whitespace-pre-wrap">{content.data.text}</p>
@@ -84,7 +192,7 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
 };
 
 
-export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey }) => {
+export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey, onRecordingComplete }) => {
   if (workspaceState.mode === 'idle') {
     return null;
   }
@@ -103,7 +211,9 @@ export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onFileSele
           </div>
         );
       case 'upload':
-        return <UploadBox onFileSelect={onFileSelect} />;
+        return <UploadBox onFileSelect={onFileSelect} uploadAction={workspaceState.uploadAction} />;
+      case 'recording':
+        return <RecordingView onRecordingComplete={onRecordingComplete} onCancel={onClearWorkspace} />;
       case 'processing':
         return (
           <div className="flex flex-col items-center space-y-3">
