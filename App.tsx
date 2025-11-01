@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { LiveServerMessage, Blob as GenaiBlob } from '@google/genai';
 
@@ -80,7 +81,7 @@ EXAMPLE SSML TEMPLATES (FOR YOUR OWN USE)
 
 - One clarifying question:
   <speak>
-    <prosody rate="95%" pitch="+2st">Boss, mabilis lang na tanong: gusto niyo po ba port <say-as interpret-as="digits">8788</say-as> pa rin, o gamitin natin <say-as interpret-as="digits">3000</as-as>? Sabihin niyo lang at susunod ako. </prosody>
+    <prosody rate="95%" pitch="+2st">Boss, mabilis lang na tanong: gusto niyo po ba port <say-as interpret-as="digits">8788</say-as> pa rin, o gamitin natin <say-as interpret-as="digits">3000</say-as>? Sabihin niyo lang at susunod ako. </prosody>
   </speak>
 
 - Error found during self-verify (non-blocking):
@@ -106,6 +107,11 @@ END OF SYSTEM PROMPT`,
     elevenLabsApiKey: '',
     ollamaCloudEndpoint: '',
     ollamaCloudApiKey: '',
+  },
+  toolSettings: {
+    generateImage: {
+      aspectRatio: '1:1',
+    },
   },
 };
 
@@ -303,7 +309,7 @@ function App() {
           appendToConversation({ speaker: 'system', text: `Calling tool: ${fc.name}(${JSON.stringify(fc.args)})` });
           setWorkspaceState({ mode: 'processing', message: `Executing tool: ${fc.name}...`, content: null });
           
-          const result = await executeTool({ name: fc.name, args: fc.args });
+          const result = await executeTool({ name: fc.name, args: fc.args }, appSettings);
           setWorkspaceState({ mode: 'result', content: result, message: 'Tool execution complete.' });
           
           sessionPromiseRef.current?.then(session => {
@@ -314,7 +320,7 @@ function App() {
         }
       }
     }
-  }, [appendToConversation, processAudioOutput]);
+  }, [appendToConversation, processAudioOutput, appSettings]);
 
   const startSession = useCallback(async () => {
     if (isRecording || sessionPromiseRef.current) return;
@@ -555,7 +561,14 @@ function App() {
       {showSettings && (
         <Settings
           settings={appSettings}
-          onSettingsChange={(newSettings) => setAppSettings(prev => ({ ...prev, ...newSettings }))}
+          onSettingsChange={(newSettings) => setAppSettings(prev => ({ 
+            ...prev, 
+            ...newSettings,
+            toolSettings: {
+              ...prev.toolSettings,
+              ...newSettings.toolSettings,
+            }
+          }))}
           onClose={() => setShowSettings(false)}
           onShowServerSettings={() => setShowServerSettings(true)}
         />

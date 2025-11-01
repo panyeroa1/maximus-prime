@@ -1,17 +1,20 @@
+
 import {
   generateImage,
   generateProText,
   analyzeTradingDataWithFlash,
 } from './geminiService';
-import { ActiveToolCall, WorkspaceContent } from '../types';
+import { ActiveToolCall, AppSettings, WorkspaceContent } from '../types';
 
-export async function executeTool(toolCall: ActiveToolCall): Promise<WorkspaceContent> {
+export async function executeTool(toolCall: ActiveToolCall, settings: AppSettings): Promise<WorkspaceContent> {
   console.log(`Executing tool: ${toolCall.name}`, toolCall.args);
 
   try {
     switch (toolCall.name) {
       case 'generateImage': {
-        const result = await generateImage(toolCall.args.prompt, toolCall.args.aspectRatio);
+        const defaultAspectRatio = settings.toolSettings.generateImage?.aspectRatio || '1:1';
+        const aspectRatio = toolCall.args.aspectRatio || defaultAspectRatio;
+        const result = await generateImage(toolCall.args.prompt, aspectRatio);
         return { type: 'image', data: result, prompt: toolCall.args.prompt };
       }
 

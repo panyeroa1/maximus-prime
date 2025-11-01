@@ -1,3 +1,4 @@
+
 import { FunctionDeclaration, Type } from '@google/genai';
 import { Tool } from '../types';
 
@@ -5,6 +6,7 @@ export const ALL_TOOLS: Tool[] = [
   {
     name: 'generateImage',
     description: 'Generate an image based on a user prompt.',
+    configurable: true,
     functionDeclaration: {
       name: 'generateImage',
       description: 'Generates an image from a textual prompt. Returns the image URL.',

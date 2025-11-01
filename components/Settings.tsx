@@ -1,5 +1,6 @@
+
 import React from 'react';
-import { AppSettings, Tool } from '../types';
+import { AppSettings, Tool, GenerateImageSettings } from '../types';
 import { ALL_TOOLS } from '../constants/tools';
 import { XMarkIcon, ServerIcon } from './icons';
 
@@ -11,6 +12,47 @@ interface SettingsProps {
 }
 
 const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Orus'];
+const ASPECT_RATIOS: GenerateImageSettings['aspectRatio'][] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+
+const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSettingsChange: (newSettings: Partial<AppSettings>) => void }> = ({ tool, settings, onSettingsChange }) => {
+  if (!tool.configurable) return null;
+
+  const handleAspectRatioChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onSettingsChange({
+      toolSettings: {
+        ...settings.toolSettings,
+        generateImage: {
+          ...settings.toolSettings?.generateImage,
+          aspectRatio: e.target.value as GenerateImageSettings['aspectRatio'],
+        },
+      },
+    });
+  };
+
+  return (
+    <div className="mt-3 pt-3 border-t border-neutral-700">
+      <h4 className="text-xs font-medium text-neutral-400 mb-2">Configuration</h4>
+      {tool.name === 'generateImage' && (
+        <div>
+          <label htmlFor="aspect-ratio" className="block text-sm font-medium text-neutral-300 mb-1">
+            Default Aspect Ratio
+          </label>
+          <select
+            id="aspect-ratio"
+            className="w-full bg-neutral-700 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            value={settings.toolSettings?.generateImage?.aspectRatio || '1:1'}
+            onChange={handleAspectRatioChange}
+          >
+            {ASPECT_RATIOS.map(ratio => (
+              <option key={ratio} value={ratio}>{ratio}</option>
+            ))}
+          </select>
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, onClose, onShowServerSettings }) => {
   const handleToolToggle = (toolName: string) => {
@@ -68,23 +110,28 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
               <h3 className="text-sm font-medium text-neutral-300 mb-2">Enabled Tools</h3>
               <div className="space-y-3">
                 {ALL_TOOLS.map((tool: Tool) => (
-                  <div key={tool.name} className="flex items-start bg-neutral-800/50 p-3 rounded-md">
-                    <div className="flex items-center h-5">
-                      <input
-                        id={tool.name}
-                        name={tool.name}
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-blue-600 focus:ring-blue-500"
-                        checked={settings.enabledTools.includes(tool.name)}
-                        onChange={() => handleToolToggle(tool.name)}
-                      />
+                  <div key={tool.name} className="flex flex-col bg-neutral-800/50 p-3 rounded-md">
+                    <div className="flex items-start">
+                      <div className="flex items-center h-5">
+                        <input
+                          id={tool.name}
+                          name={tool.name}
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-blue-600 focus:ring-blue-500"
+                          checked={settings.enabledTools.includes(tool.name)}
+                          onChange={() => handleToolToggle(tool.name)}
+                        />
+                      </div>
+                      <div className="ml-3 text-sm">
+                        <label htmlFor={tool.name} className="font-medium text-white">
+                          {tool.name}
+                        </label>
+                        <p className="text-neutral-400">{tool.description}</p>
+                      </div>
                     </div>
-                    <div className="ml-3 text-sm">
-                      <label htmlFor={tool.name} className="font-medium text-white">
-                        {tool.name}
-                      </label>
-                      <p className="text-neutral-400">{tool.description}</p>
-                    </div>
+                    {settings.enabledTools.includes(tool.name) && (
+                      <ToolConfiguration tool={tool} settings={settings} onSettingsChange={onSettingsChange} />
+                    )}
                   </div>
                 ))}
               </div>

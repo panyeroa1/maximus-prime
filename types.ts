@@ -1,3 +1,4 @@
+
 import { FunctionDeclaration } from '@google/genai';
 
 export interface ConversationTurn {
@@ -18,16 +19,26 @@ export interface ServerSettings {
   ollamaCloudApiKey: string;
 }
 
+export interface GenerateImageSettings {
+  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+}
+
+export interface ToolSettings {
+  generateImage?: GenerateImageSettings;
+}
+
 export interface AppSettings {
   systemInstruction: string;
   voice: string;
   enabledTools: string[];
   serverSettings: ServerSettings;
+  toolSettings: ToolSettings;
 }
 
 export interface Tool {
   name: string;
   description: string;
+  configurable?: boolean;
   functionDeclaration?: FunctionDeclaration;
 }
 
