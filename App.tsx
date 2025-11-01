@@ -54,7 +54,6 @@ function App() {
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const inputAudioContextRef = useRef<AudioContext | null>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
-  const inputNodeRef = useRef<GainNode | null>(null);
   const outputNodeRef = useRef<GainNode | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -68,6 +67,46 @@ function App() {
   const currentInputTranscriptionRef = useRef('');
   const currentOutputTranscriptionRef = useRef('');
 
+  const initOutputAudioContext = useCallback(() => {
+    if (!outputAudioContextRef.current || outputAudioContextRef.current.state === 'closed') {
+      const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) {
+        console.error("AudioContext is not supported.");
+        return;
+      }
+      outputAudioContextRef.current = new Ctx({ sampleRate: 24000 });
+      outputNodeRef.current = outputAudioContextRef.current.createGain();
+      outputNodeRef.current.connect(outputAudioContextRef.current.destination);
+    }
+  }, []);
+
+  const playChime = useCallback(() => {
+    initOutputAudioContext();
+    if (!outputAudioContextRef.current || !outputNodeRef.current) return;
+
+    const context = outputAudioContextRef.current;
+    const gainNode = outputNodeRef.current;
+    const now = context.currentTime;
+
+    gainNode.gain.setValueAtTime(0.1, now); // Set a gentle volume
+
+    // First tone
+    const osc1 = context.createOscillator();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, now); // A5
+    osc1.connect(gainNode);
+    osc1.start(now);
+    osc1.stop(now + 0.1);
+
+    // Second tone
+    const osc2 = context.createOscillator();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(1046.50, now + 0.12); // C6
+    osc2.connect(gainNode);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.22);
+  }, [initOutputAudioContext]);
+
   const appendToConversation = useCallback((turn: Omit<ConversationTurn, 'timestamp'>) => {
     setConversation(prev => [...prev, { ...turn, timestamp: Date.now() }]);
   }, []);
@@ -79,6 +118,7 @@ function App() {
   };
 
   const processAudioOutput = useCallback(async (base64Audio: string) => {
+    initOutputAudioContext();
     if (!outputAudioContextRef.current || !outputNodeRef.current) return;
     setIsSpeaking(true);
 
@@ -105,7 +145,7 @@ function App() {
     source.start(startTime);
     nextStartTimeRef.current = startTime + audioBuffer.duration;
     sourcesRef.current.add(source);
-  }, []);
+  }, [initOutputAudioContext]);
 
   const stopAudioPlayback = () => {
     sourcesRef.current.forEach(source => {
@@ -120,6 +160,22 @@ function App() {
     setIsSpeaking(false);
   };
 
+  const stopMicAndCleanup = useCallback(() => {
+    mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+    mediaStreamRef.current = null;
+    
+    scriptProcessorRef.current?.disconnect();
+    scriptProcessorRef.current = null;
+    
+    analyserNodeRef.current?.disconnect();
+    analyserNodeRef.current = null;
+
+    if (inputAudioContextRef.current && inputAudioContextRef.current.state !== 'closed') {
+      inputAudioContextRef.current.close().catch(e => console.warn("Error closing input audio context", e));
+    }
+    inputAudioContextRef.current = null;
+  }, []);
+  
   const onLiveMessage = useCallback(async (message: LiveServerMessage) => {
     if (message.serverContent) {
       const { inputTranscription, outputTranscription, modelTurn, turnComplete, interrupted } = message.serverContent;
@@ -148,17 +204,20 @@ function App() {
 
     if (message.toolCall?.functionCalls) {
       for (const fc of message.toolCall.functionCalls) {
-        appendToConversation({ speaker: 'system', text: `Calling tool: ${fc.name}(${JSON.stringify(fc.args)})` });
-        setWorkspaceState({ mode: 'processing', message: `Executing tool: ${fc.name}...`, content: null });
-        
-        const result = await executeTool(fc);
-        setWorkspaceState({ mode: 'result', content: result, message: 'Tool execution complete.' });
-        
-        sessionPromiseRef.current?.then(session => {
-          session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result.data) } } });
-        });
-        
-        appendToConversation({ speaker: 'system', text: `Tool ${fc.name} finished.` });
+        // Fix: Ensure function call has a name before executing, and pass a valid ActiveToolCall object.
+        if (fc.name) {
+          appendToConversation({ speaker: 'system', text: `Calling tool: ${fc.name}(${JSON.stringify(fc.args)})` });
+          setWorkspaceState({ mode: 'processing', message: `Executing tool: ${fc.name}...`, content: null });
+          
+          const result = await executeTool({ name: fc.name, args: fc.args });
+          setWorkspaceState({ mode: 'result', content: result, message: 'Tool execution complete.' });
+          
+          sessionPromiseRef.current?.then(session => {
+            session.sendToolResponse({ functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result.data) } } });
+          });
+          
+          appendToConversation({ speaker: 'system', text: `Tool ${fc.name} finished.` });
+        }
       }
     }
   }, [appendToConversation, processAudioOutput]);
@@ -169,33 +228,39 @@ function App() {
 
     try {
       sessionPromiseRef.current = startLiveSession(appSettings, {
-        onopen: () => {
-          console.log('Session opened');
-        },
+        onopen: () => console.log('Session opened'),
         onmessage: onLiveMessage,
         onerror: (e: ErrorEvent) => console.error('Session error:', e),
         onclose: (e: CloseEvent) => {
           console.log('Session closed');
           sessionPromiseRef.current = null;
-          setIsRecording(false);
+          if (isRecording) {
+            setIsRecording(false);
+            stopAudioPlayback();
+          }
         },
       });
       await sessionPromiseRef.current;
+      playChime();
       setIsRecording(true);
     } catch (error) {
       console.error('Failed to start session:', error);
       sessionPromiseRef.current = null;
     }
-  }, [isRecording, appSettings, onLiveMessage]);
+  }, [isRecording, appSettings, onLiveMessage, playChime]);
 
   const stopSession = useCallback(() => {
-    sessionPromiseRef.current?.then(session => {
-      session.close();
-    }).catch(e => console.error("Error closing session:", e));
-    sessionPromiseRef.current = null;
-    setIsRecording(false);
-    stopAudioPlayback();
-  }, []);
+    if (sessionPromiseRef.current) {
+        sessionPromiseRef.current.then(session => {
+          session.close();
+        }).catch(e => console.error("Error closing session:", e));
+        sessionPromiseRef.current = null;
+    }
+    if (isRecording) {
+      setIsRecording(false);
+      stopAudioPlayback();
+    }
+  }, [isRecording]);
 
   const handleToggleRecording = useCallback(() => {
     if (isRecording) {
@@ -211,58 +276,60 @@ function App() {
     setWorkspaceState({ mode: 'idle', content: null, message: '' });
   };
   
-  // Mic input processing for visualizer and sending to API
   useEffect(() => {
-    const setupAudio = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        mediaStreamRef.current = stream;
-        
-        const context = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 16000 });
-        inputAudioContextRef.current = context;
-        outputAudioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-        
-        inputNodeRef.current = context.createGain();
-        outputNodeRef.current = outputAudioContextRef.current.createGain();
-        outputNodeRef.current.connect(outputAudioContextRef.current.destination);
-        
-        const source = context.createMediaStreamSource(stream);
-        const processor = context.createScriptProcessor(4096, 1, 1);
-        scriptProcessorRef.current = processor;
-        
-        const analyser = context.createAnalyser();
-        analyser.fftSize = 512;
-        analyserNodeRef.current = analyser;
-        
-        source.connect(analyser);
-        analyser.connect(processor);
-        processor.connect(context.destination);
-        
-        processor.onaudioprocess = (e) => {
-          if (!isRecording) return;
-          const inputData = e.inputBuffer.getChannelData(0);
-          const pcmBlob: GenaiBlob = {
-            data: encode(new Uint8Array(new Int16Array(inputData.map(x => x * 32768)).buffer)),
-            mimeType: 'audio/pcm;rate=16000',
-          };
-          sessionPromiseRef.current?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
-        };
-      } catch (error) {
-        console.error("Error setting up audio:", error);
-      }
+    const setupMic = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaStreamRef.current = stream;
+            
+            const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+            const context = new Ctx({ sampleRate: 16000 });
+            inputAudioContextRef.current = context;
+            
+            const source = context.createMediaStreamSource(stream);
+            const processor = context.createScriptProcessor(4096, 1, 1);
+            scriptProcessorRef.current = processor;
+            
+            const analyser = context.createAnalyser();
+            analyser.fftSize = 512;
+            analyserNodeRef.current = analyser;
+            
+            source.connect(analyser);
+            analyser.connect(processor);
+            processor.connect(context.destination);
+            
+            processor.onaudioprocess = (e) => {
+              if (!isRecording) return;
+              const inputData = e.inputBuffer.getChannelData(0);
+              const pcmBlob: GenaiBlob = {
+                data: encode(new Uint8Array(new Int16Array(inputData.map(x => x * 32768)).buffer)),
+                mimeType: 'audio/pcm;rate=16000',
+              };
+              sessionPromiseRef.current?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
+            };
+        } catch (error) {
+            console.error("Error setting up microphone:", error);
+            setIsRecording(false);
+        }
     };
-    setupAudio();
+    
+    if (isRecording) {
+        setupMic();
+    }
 
     return () => {
-      mediaStreamRef.current?.getTracks().forEach(track => track.stop());
-      inputAudioContextRef.current?.close();
-      outputAudioContextRef.current?.close();
-      scriptProcessorRef.current?.disconnect();
-      stopSession();
+        stopMicAndCleanup();
     };
-  }, [stopSession, isRecording]);
+  }, [isRecording, stopMicAndCleanup]);
 
-  // Amplitude visualizer effect
+  useEffect(() => {
+    return () => {
+        if (outputAudioContextRef.current && outputAudioContextRef.current.state !== 'closed') {
+            outputAudioContextRef.current.close().catch(console.warn);
+        }
+    }
+  }, []);
+
   useEffect(() => {
     let animationFrameId: number;
     const visualize = () => {
