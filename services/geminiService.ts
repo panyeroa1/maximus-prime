@@ -41,14 +41,11 @@ export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice as any } },
       },
-      systemInstruction: { parts: [{ text: settings.systemInstruction }] },
+      // Fix: systemInstruction should be a string for this config.
+      systemInstruction: settings.systemInstruction,
       tools: finalTools.length > 0 ? finalTools : undefined,
       outputAudioTranscription: {},
       inputAudioTranscription: {},
-      contextWindowCompression: {
-        triggerTokens: '25600',
-        slidingWindow: { targetTokens: '12800' },
-      },
     },
   });
 }
@@ -110,11 +107,11 @@ export async function generateVideo(
 ): Promise<string> {
     
     onProgress('Checking API Key...');
-    if (typeof window.aistudio?.hasSelectedApiKey !== 'function') {
+    if (typeof (window as any).aistudio?.hasSelectedApiKey !== 'function') {
       throw new Error("Veo requires API key selection. Please run in the correct environment.");
     }
 
-    const keySelected = await window.aistudio.hasSelectedApiKey();
+    const keySelected = await (window as any).aistudio.hasSelectedApiKey();
     if (!keySelected) {
         throw new Error('API_KEY_REQUIRED');
     }
@@ -193,7 +190,7 @@ export async function generateTextWithGoogleMaps(prompt: string): Promise<Genera
 export async function generateLowLatencyText(prompt: string): Promise<string> {
     const ai = getAiInstance();
     const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-lite',
+        model: 'gemini-flash-lite-latest',
         contents: prompt,
     });
     return response.text;
