@@ -6,32 +6,10 @@ export const ALL_TOOLS: Tool[] = [
   {
     name: 'groundedSearch',
     description: 'Use Google Search for up-to-date information on recent events, news, or any topic that requires current data from the web.',
-    functionDeclaration: {
-      name: 'groundedSearch',
-      description: 'Performs a Google Search to answer questions about recent events or provide up-to-date information.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          query: { type: Type.STRING, description: 'The search query.' },
-        },
-        required: ['query'],
-      },
-    },
   },
   {
     name: 'groundedMapSearch',
     description: 'Use Google Maps to find places, get information about locations, or answer geography-related questions.',
-    functionDeclaration: {
-      name: 'groundedMapSearch',
-      description: 'Finds places or gets information about locations using Google Maps.',
-      parameters: {
-        type: Type.OBJECT,
-        properties: {
-          query: { type: Type.STRING, description: 'The query for Google Maps, e.g., "good Italian restaurants nearby" or "capital of France".' },
-        },
-        required: ['query'],
-      },
-    },
   },
   {
     name: 'quickQuery',

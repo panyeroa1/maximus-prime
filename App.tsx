@@ -320,20 +320,6 @@ export default function App() {
                             addTurn({ speaker: 'system', text: result });
                           }
                           break;
-                      case 'groundedSearch':
-                          setWorkspaceState({ mode: 'processing', message: 'Searching Google...', content: null });
-                          const searchRes = await geminiService.generateTextWithGoogleSearch(String(fc.args.query));
-                          const sources = searchRes.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.web) || [];
-                          setWorkspaceState({ mode: 'result', content: { type: 'grounding_search', data: { text: searchRes.text, sources } }, message: '' });
-                          playAudio(await geminiService.generateSpeech(String(searchRes.text)));
-                          break;
-                      case 'groundedMapSearch':
-                          setWorkspaceState({ mode: 'processing', message: 'Searching Google Maps...', content: null });
-                          const mapRes = await geminiService.generateTextWithGoogleMaps(String(fc.args.query));
-                          const mapSources = mapRes.candidates?.[0]?.groundingMetadata?.groundingChunks?.map((c: any) => c.maps) || [];
-                          setWorkspaceState({ mode: 'result', content: { type: 'grounding_maps', data: { text: mapRes.text, sources: mapSources } }, message: '' });
-                          playAudio(await geminiService.generateSpeech(String(mapRes.text)));
-                          break;
                       case 'quickQuery':
                           const quickText = await geminiService.generateLowLatencyText(String(fc.args.query));
                           playAudio(await geminiService.generateSpeech(quickText));

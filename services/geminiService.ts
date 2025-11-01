@@ -17,9 +17,21 @@ function getAiInstance(): GoogleGenAI {
 // Live Session
 export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks): Promise<any> {
   const ai = getAiInstance();
-  const enabledTools: FunctionDeclaration[] = ALL_TOOLS
-    .filter(tool => settings.enabledTools.includes(tool.name))
-    .map(tool => tool.functionDeclaration);
+  
+  const functionDeclarations: FunctionDeclaration[] = ALL_TOOLS
+    .filter(tool => settings.enabledTools.includes(tool.name) && tool.functionDeclaration)
+    .map(tool => tool.functionDeclaration!);
+
+  const finalTools: any[] = [];
+  if (functionDeclarations.length > 0) {
+    finalTools.push({ functionDeclarations });
+  }
+  if (settings.enabledTools.includes('groundedSearch')) {
+    finalTools.push({ googleSearch: {} });
+  }
+  if (settings.enabledTools.includes('groundedMapSearch')) {
+    finalTools.push({ googleMaps: {} });
+  }
 
   return ai.live.connect({
     model: 'gemini-2.5-flash-native-audio-preview-09-2025',
@@ -29,13 +41,18 @@ export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice as any } },
       },
-      systemInstruction: settings.systemInstruction,
-      tools: enabledTools.length > 0 ? [{ functionDeclarations: enabledTools }] : undefined,
+      systemInstruction: { parts: [{ text: settings.systemInstruction }] },
+      tools: finalTools.length > 0 ? finalTools : undefined,
       outputAudioTranscription: {},
       inputAudioTranscription: {},
+      contextWindowCompression: {
+        triggerTokens: '25600',
+        slidingWindow: { targetTokens: '12800' },
+      },
     },
   });
 }
+
 
 // Image Generation
 export async function generateImage(prompt: string, aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4' = '1:1'): Promise<string> {

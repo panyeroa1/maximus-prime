@@ -28,7 +28,7 @@ export interface AppSettings {
 export interface Tool {
   name: string;
   description: string;
-  functionDeclaration: FunctionDeclaration;
+  functionDeclaration?: FunctionDeclaration;
 }
 
 export interface ActiveToolCall {
