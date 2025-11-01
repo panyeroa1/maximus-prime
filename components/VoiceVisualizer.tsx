@@ -9,9 +9,9 @@ interface VoiceVisualizerProps {
 export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, isSpeaking, micAmplitude }) => {
   const isActive = isRecording || isSpeaking;
 
-  // Calculate dynamic styles for the inner core based on mic input
-  const coreScale = 0.5 + micAmplitude * 0.7;
-  const coreOpacity = 0.4 + micAmplitude * 0.6;
+  // Enhanced dynamic styles for the inner core based on mic input for a more pronounced effect
+  const coreScale = 0.6 + micAmplitude * 1.2; // Base scale 0.6, expands up to 1.8
+  const coreOpacity = 0.3 + micAmplitude * 0.7; // Base opacity 0.3, up to 1.0
 
   return (
     <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
@@ -58,7 +58,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
         className="absolute w-1/3 h-1/3 rounded-full bg-white/30 pointer-events-none"
         style={{
           filter: 'blur(20px)',
-          transform: `scale(${isRecording ? coreScale : 0.5})`,
+          transform: `scale(${isRecording ? coreScale : 0})`, // Start from scale 0 for a smoother appearance
           opacity: isRecording ? coreOpacity : 0,
           transition: 'transform 100ms ease-out, opacity 200ms ease-out',
         }}

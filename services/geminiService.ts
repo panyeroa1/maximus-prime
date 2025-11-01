@@ -41,8 +41,8 @@ export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks
       speechConfig: {
         voiceConfig: { prebuiltVoiceConfig: { voiceName: settings.voice as any } },
       },
-      // Fix: systemInstruction should be a string for this config.
-      systemInstruction: settings.systemInstruction,
+      // Fix: systemInstruction must be a Content object, not a raw string.
+      systemInstruction: { parts: [{ text: settings.systemInstruction }] },
       tools: finalTools.length > 0 ? finalTools : undefined,
       outputAudioTranscription: {},
       inputAudioTranscription: {},
