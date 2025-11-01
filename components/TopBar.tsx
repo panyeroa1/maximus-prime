@@ -1,39 +1,37 @@
 import React from 'react';
-import { CCIcon, VolumeIcon, SettingsIcon } from './icons';
+import { CCIcon, SpeakerWaveIcon, AdjustmentsHorizontalIcon } from './icons';
 
 interface TopBarProps {
-  isSessionActive: boolean;
+  onOpenSettings: () => void;
   onToggleCaptions: () => void;
-  onToggleSettings: () => void;
+  isCaptionsOn: boolean;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ isSessionActive, onToggleCaptions, onToggleSettings }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onOpenSettings, onToggleCaptions, isCaptionsOn }) => {
   return (
-    <header className="absolute top-0 left-0 right-0 p-4 z-10 flex justify-between items-center">
-      {/* Left spacer for centering */}
-      <div className="w-24"></div>
-
-      {/* Centered 'Connected' indicator */}
-      <div className="flex-1 text-center">
-        {isSessionActive && (
-          <span className="text-green-400 text-sm font-semibold animate-pulse">
-            Connected
-          </span>
-        )}
-      </div>
-
-      {/* Right-aligned buttons */}
-      <div className="flex items-center justify-end space-x-4 w-24">
-        <button onClick={onToggleCaptions} className="text-gray-400 hover:text-white transition-colors">
-          <CCIcon className="w-7 h-7" />
+    <div className="fixed top-0 left-0 right-0 p-4 flex justify-end items-center z-20 bg-gradient-to-b from-black/50 to-transparent">
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={onToggleCaptions}
+          className={`p-2 rounded-full transition-colors ${isCaptionsOn ? 'bg-white/20 text-white' : 'text-gray-300 hover:text-white hover:bg-white/10'}`}
+          aria-label={isCaptionsOn ? 'Hide Captions' : 'Show Captions'}
+        >
+          <CCIcon className="w-6 h-6" />
         </button>
-        <button className="text-gray-400 hover:text-white transition-colors">
-          <VolumeIcon className="w-7 h-7" />
+        <button
+          className="text-gray-300 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+          aria-label="Volume"
+        >
+          <SpeakerWaveIcon className="w-6 h-6" />
         </button>
-        <button onClick={onToggleSettings} className="text-gray-400 hover:text-white transition-colors">
-          <SettingsIcon className="w-7 h-7" />
+        <button
+          onClick={onOpenSettings}
+          className="text-gray-300 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+          aria-label="Open Settings"
+        >
+          <AdjustmentsHorizontalIcon className="w-6 h-6" />
         </button>
       </div>
-    </header>
+    </div>
   );
 };

@@ -1,25 +1,28 @@
 import React from 'react';
 
 interface VoiceVisualizerProps {
+  isRecording: boolean;
   isSpeaking: boolean;
 }
 
-export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isSpeaking }) => {
+export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, isSpeaking }) => {
+  const isActive = isRecording || isSpeaking;
+
   return (
     <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
-      {/* Outer glow */}
+      {/* Outer glow for any activity */}
       <div
         className={`absolute w-full h-full rounded-full transition-all duration-500 ease-in-out ${
-          isSpeaking ? 'scale-110' : 'scale-100'
+          isActive ? 'scale-110' : 'scale-100'
         }`}
         style={{
-          boxShadow: isSpeaking
+          boxShadow: isActive
             ? '0 0 60px 20px rgba(59, 130, 246, 0.5), 0 0 100px 40px rgba(147, 197, 253, 0.3)'
             : '0 0 30px 10px rgba(59, 130, 246, 0.4), 0 0 60px 20px rgba(147, 197, 253, 0.2)',
         }}
       ></div>
       
-      {/* Main Orb */}
+      {/* Main Orb - pulses when AI is speaking */}
       <div
         className={`w-full h-full rounded-full overflow-hidden transition-transform duration-500 ease-in-out ${
           isSpeaking ? 'animate-pulse-strong' : 'animate-pulse-gentle'
@@ -44,6 +47,17 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isSpeaking }) 
            </div>
         </div>
       </div>
+      
+      {/* Inner Core - pulses when user is recording (mic input) */}
+      <div
+        className={`absolute w-1/3 h-1/3 rounded-full bg-white/30 transition-all duration-300 ease-in-out pointer-events-none ${
+          isRecording ? 'animate-pulse-record' : 'opacity-0 scale-50'
+        }`}
+        style={{
+          filter: 'blur(20px)',
+        }}
+      ></div>
+
        <style>
         {`
           @keyframes pulse-gentle {
@@ -62,6 +76,10 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isSpeaking }) 
             0% { transform: rotate(0deg) scale(1.3); }
             100% { transform: rotate(-360deg) scale(1.3); }
           }
+          @keyframes pulse-record {
+            0%, 100% { transform: scale(0.8); opacity: 0.7; }
+            50% { transform: scale(1); opacity: 1; }
+          }
           .animate-pulse-gentle {
             animation: pulse-gentle 5s infinite ease-in-out;
           }
@@ -73,6 +91,9 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isSpeaking }) 
           }
           .animate-cloud-spin-fast {
             animation: cloud-spin-fast 30s linear infinite;
+          }
+          .animate-pulse-record {
+            animation: pulse-record 1.5s infinite ease-in-out;
           }
         `}
       </style>
