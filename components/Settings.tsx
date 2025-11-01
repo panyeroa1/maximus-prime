@@ -10,7 +10,7 @@ interface SettingsProps {
   onShowServerSettings: () => void;
 }
 
-const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir'];
+const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Orus'];
 
 export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, onClose, onShowServerSettings }) => {
   const handleToolToggle = (toolName: string) => {
