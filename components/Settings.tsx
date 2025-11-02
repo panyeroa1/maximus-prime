@@ -1,8 +1,8 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AppSettings, Tool, GenerateImageSettings, VoiceEmotion } from '../types';
 import { ALL_TOOLS } from '../constants/tools';
-import { XMarkIcon, ServerIcon } from './icons';
+import { XMarkIcon, ServerIcon, ChevronDownIcon } from './icons';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -14,6 +14,28 @@ interface SettingsProps {
 const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Orus'];
 const EMOTIONS: VoiceEmotion[] = ['neutral', 'happy', 'sad', 'angry'];
 const ASPECT_RATIOS: GenerateImageSettings['aspectRatio'][] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+
+const CollapsibleSection: React.FC<{ title: string; isOpen: boolean; onToggle: () => void; children: React.ReactNode }> = ({ title, isOpen, onToggle, children }) => {
+  return (
+    <div className="border-b border-neutral-800 last:border-b-0">
+      <button
+        onClick={onToggle}
+        className="flex justify-between items-center w-full py-4 text-left font-medium text-neutral-200 hover:bg-neutral-800/50 px-2 rounded-md transition-colors"
+        aria-expanded={isOpen}
+      >
+        <span>{title}</span>
+        <ChevronDownIcon className={`w-5 h-5 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+      <div
+        className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-[1000px] opacity-100' : 'max-h-0 opacity-0'}`}
+      >
+        <div className="pt-2 pb-4 px-2">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSettingsChange: (newSettings: Partial<AppSettings>) => void }> = ({ tool, settings, onSettingsChange }) => {
   if (!tool.configurable) return null;
@@ -56,6 +78,16 @@ const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSetting
 
 
 export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, onClose, onShowServerSettings }) => {
+  const [openSections, setOpenSections] = useState({
+    general: true,
+    voice: true,
+    tools: false,
+  });
+
+  const toggleSection = (section: keyof typeof openSections) => {
+    setOpenSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
   const handleToolToggle = (toolName: string) => {
     const newEnabledTools = settings.enabledTools.includes(toolName)
       ? settings.enabledTools.filter(t => t !== toolName)
@@ -73,9 +105,9 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto">
-          <div className="space-y-6">
-            {/* System Instruction */}
+        <div className="px-4 overflow-y-auto">
+          {/* General Section */}
+          <CollapsibleSection title="General" isOpen={openSections.general} onToggle={() => toggleSection('general')}>
             <div>
               <label htmlFor="system-instruction" className="block text-sm font-medium text-neutral-300 mb-2">
                 System Instruction
@@ -88,111 +120,115 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
                 onChange={(e) => onSettingsChange({ systemInstruction: e.target.value })}
               />
             </div>
+          </CollapsibleSection>
 
-            {/* Voice Selection */}
-            <div>
-              <label htmlFor="voice" className="block text-sm font-medium text-neutral-300 mb-2">
-                AI Voice
-              </label>
-              <select
-                id="voice"
-                className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                value={settings.voice}
-                onChange={(e) => onSettingsChange({ voice: e.target.value })}
-              >
-                {VOICES.map(voice => (
-                  <option key={voice} value={voice}>{voice}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Voice Customization */}
-            <div>
-              <h3 className="text-sm font-medium text-neutral-300 mb-2">Voice Customization</h3>
-              <div className="space-y-4 bg-neutral-800/50 p-3 rounded-md">
-                {/* Emotion Dropdown */}
-                 <div>
-                  <label htmlFor="emotion" className="block text-sm font-medium text-neutral-300 mb-1">
-                    AI Emotion
-                  </label>
-                  <select
-                    id="emotion"
-                    className="w-full bg-neutral-700 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none capitalize"
-                    value={settings.emotion}
-                    onChange={(e) => onSettingsChange({ emotion: e.target.value as VoiceEmotion })}
-                  >
-                    {EMOTIONS.map(emotion => (
-                      <option key={emotion} value={emotion} className="capitalize">{emotion}</option>
-                    ))}
-                  </select>
-                </div>
-                {/* Rate Slider */}
-                <div>
-                  <label htmlFor="rate" className="block text-sm font-medium text-neutral-300 mb-1">
-                    Rate ({settings.rate}%)
-                  </label>
-                  <input
-                    id="rate"
-                    type="range"
-                    min="75"
-                    max="150"
-                    step="1"
-                    value={settings.rate}
-                    onChange={(e) => onSettingsChange({ rate: parseInt(e.target.value, 10) })}
-                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                  />
-                </div>
-                {/* Pitch Slider */}
-                <div>
-                  <label htmlFor="pitch" className="block text-sm font-medium text-neutral-300 mb-1">
-                    Pitch ({settings.pitch > 0 ? '+' : ''}{settings.pitch} st)
-                  </label>
-                  <input
-                    id="pitch"
-                    type="range"
-                    min="-8"
-                    max="8"
-                    step="1"
-                    value={settings.pitch}
-                    onChange={(e) => onSettingsChange({ pitch: parseInt(e.target.value, 10) })}
-                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                  />
-                </div>
+          {/* Voice & Emotion Section */}
+          <CollapsibleSection title="Voice & Emotion" isOpen={openSections.voice} onToggle={() => toggleSection('voice')}>
+            <div className="space-y-6">
+              {/* Voice Selection */}
+              <div>
+                <label htmlFor="voice" className="block text-sm font-medium text-neutral-300 mb-2">
+                  AI Voice
+                </label>
+                <select
+                  id="voice"
+                  className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  value={settings.voice}
+                  onChange={(e) => onSettingsChange({ voice: e.target.value })}
+                >
+                  {VOICES.map(voice => (
+                    <option key={voice} value={voice}>{voice}</option>
+                  ))}
+                </select>
               </div>
-            </div>
 
-            {/* Tools */}
-            <div>
-              <h3 className="text-sm font-medium text-neutral-300 mb-2">Enabled Tools</h3>
-              <div className="space-y-3">
-                {ALL_TOOLS.map((tool: Tool) => (
-                  <div key={tool.name} className="flex flex-col bg-neutral-800/50 p-3 rounded-md">
-                    <div className="flex items-start">
-                      <div className="flex items-center h-5">
-                        <input
-                          id={tool.name}
-                          name={tool.name}
-                          type="checkbox"
-                          className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-blue-600 focus:ring-blue-500"
-                          checked={settings.enabledTools.includes(tool.name)}
-                          onChange={() => handleToolToggle(tool.name)}
-                        />
-                      </div>
-                      <div className="ml-3 text-sm">
-                        <label htmlFor={tool.name} className="font-medium text-white">
-                          {tool.name}
-                        </label>
-                        <p className="text-neutral-400">{tool.description}</p>
-                      </div>
-                    </div>
-                    {settings.enabledTools.includes(tool.name) && (
-                      <ToolConfiguration tool={tool} settings={settings} onSettingsChange={onSettingsChange} />
-                    )}
+              {/* Voice Customization */}
+              <div>
+                <h3 className="text-sm font-medium text-neutral-300 mb-2">Voice Customization</h3>
+                <div className="space-y-4 bg-neutral-800/50 p-3 rounded-md">
+                  {/* Emotion Dropdown */}
+                   <div>
+                    <label htmlFor="emotion" className="block text-sm font-medium text-neutral-300 mb-1">
+                      AI Emotion
+                    </label>
+                    <select
+                      id="emotion"
+                      className="w-full bg-neutral-700 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none capitalize"
+                      value={settings.emotion}
+                      onChange={(e) => onSettingsChange({ emotion: e.target.value as VoiceEmotion })}
+                    >
+                      {EMOTIONS.map(emotion => (
+                        <option key={emotion} value={emotion} className="capitalize">{emotion}</option>
+                      ))}
+                    </select>
                   </div>
-                ))}
+                  {/* Rate Slider */}
+                  <div>
+                    <label htmlFor="rate" className="block text-sm font-medium text-neutral-300 mb-1">
+                      Rate ({settings.rate}%)
+                    </label>
+                    <input
+                      id="rate"
+                      type="range"
+                      min="75"
+                      max="150"
+                      step="1"
+                      value={settings.rate}
+                      onChange={(e) => onSettingsChange({ rate: parseInt(e.target.value, 10) })}
+                      className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+                  {/* Pitch Slider */}
+                  <div>
+                    <label htmlFor="pitch" className="block text-sm font-medium text-neutral-300 mb-1">
+                      Pitch ({settings.pitch > 0 ? '+' : ''}{settings.pitch} st)
+                    </label>
+                    <input
+                      id="pitch"
+                      type="range"
+                      min="-8"
+                      max="8"
+                      step="1"
+                      value={settings.pitch}
+                      onChange={(e) => onSettingsChange({ pitch: parseInt(e.target.value, 10) })}
+                      className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
+
+          {/* Tools Section */}
+          <CollapsibleSection title="Enabled Tools" isOpen={openSections.tools} onToggle={() => toggleSection('tools')}>
+            <div className="space-y-3">
+              {ALL_TOOLS.map((tool: Tool) => (
+                <div key={tool.name} className="flex flex-col bg-neutral-800/50 p-3 rounded-md">
+                  <div className="flex items-start">
+                    <div className="flex items-center h-5">
+                      <input
+                        id={tool.name}
+                        name={tool.name}
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-blue-600 focus:ring-blue-500"
+                        checked={settings.enabledTools.includes(tool.name)}
+                        onChange={() => handleToolToggle(tool.name)}
+                      />
+                    </div>
+                    <div className="ml-3 text-sm">
+                      <label htmlFor={tool.name} className="font-medium text-white">
+                        {tool.name}
+                      </label>
+                      <p className="text-neutral-400">{tool.description}</p>
+                    </div>
+                  </div>
+                  {settings.enabledTools.includes(tool.name) && (
+                    <ToolConfiguration tool={tool} settings={settings} onSettingsChange={onSettingsChange} />
+                  )}
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
         </div>
         
         <div className="p-4 border-t border-neutral-700 mt-auto">
