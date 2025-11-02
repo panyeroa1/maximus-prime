@@ -4,6 +4,7 @@ import { FunctionDeclaration, Type } from '@google/genai';
 import phoneRing from './assets/audio/phone-ring.wav';
 import elevatorMusic from './assets/audio/elevator-music.wav';
 import busySignal from './assets/audio/busy-signal.wav';
+import holdCue from './assets/audio/hold.mp3';
 
 export const NAV_ITEMS = [
   { id: ActiveView.CallLogs, label: 'Call Logs', icon: HistoryIcon },
@@ -132,7 +133,7 @@ export const MOCK_KNOWLEDGE_BASE = {
 
 export const AUDIO_ASSETS = {
   ring: phoneRing,
-  hold: elevatorMusic,
+  hold: holdCue,
   busy: busySignal
 };
 

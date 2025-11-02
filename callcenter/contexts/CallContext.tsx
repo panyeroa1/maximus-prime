@@ -37,6 +37,7 @@ export const CallProvider: React.FC<CallProviderProps> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const statusRef = useRef(status);
   const callStateTimersRef = useRef<number[]>([]);
+  const holdSoundTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     statusRef.current = status;
@@ -53,6 +54,10 @@ export const CallProvider: React.FC<CallProviderProps> = ({ children }) => {
       if (durationIntervalRef.current) {
         clearInterval(durationIntervalRef.current);
       }
+      if (holdSoundTimerRef.current) {
+        clearTimeout(holdSoundTimerRef.current);
+        holdSoundTimerRef.current = null;
+      }
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
@@ -61,22 +66,44 @@ export const CallProvider: React.FC<CallProviderProps> = ({ children }) => {
     };
   }, [clearCallStateTimers]);
 
+  const clearHoldTimer = useCallback(() => {
+    if (holdSoundTimerRef.current) {
+      clearTimeout(holdSoundTimerRef.current);
+      holdSoundTimerRef.current = null;
+    }
+  }, []);
+
   const playSound = useCallback((sound: 'ring' | 'hold' | 'busy', loop = false) => {
     if (!audioRef.current) {
       audioRef.current = new Audio();
     }
-    audioRef.current.pause();
-    audioRef.current.src = AUDIO_ASSETS[sound];
-    audioRef.current.loop = loop;
-    audioRef.current.play().catch(e => console.error("Audio playback error:", e));
-  }, []);
+    const audioEl = audioRef.current;
+    audioEl.pause();
+    audioEl.currentTime = 0;
+    audioEl.src = AUDIO_ASSETS[sound];
+    audioEl.loop = sound === 'hold' ? true : loop;
+    audioEl.volume = sound === 'hold' ? 0.15 : 1;
+    audioEl.play().catch(e => console.error("Audio playback error:", e));
+    if (sound === 'hold') {
+      clearHoldTimer();
+      holdSoundTimerRef.current = window.setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.currentTime = 0;
+        }
+      }, 15000);
+    } else {
+      clearHoldTimer();
+    }
+  }, [clearHoldTimer]);
 
   const stopSound = useCallback(() => {
+    clearHoldTimer();
     if (audioRef.current && !audioRef.current.paused) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
     }
-  }, []);
+  }, [clearHoldTimer]);
 
   const handleKeyPress = (key: string) => {
     if (status !== 'connected' && number.length < 15) {

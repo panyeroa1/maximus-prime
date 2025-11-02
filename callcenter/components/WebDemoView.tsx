@@ -114,15 +114,47 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
     
     const audioRef = useRef<HTMLAudioElement>(new Audio());
     const holdAudioRef = useRef<HTMLAudioElement | null>(null);
+    const holdTimeoutRef = useRef<number | null>(null);
 
     const durationIntervalRef = useRef<number | null>(null);
     const callTimersRef = useRef<number[]>([]);
     const isMobile = useIsMobile();
 
 
+    const clearHoldTimeout = useCallback(() => {
+        if (holdTimeoutRef.current) {
+            clearTimeout(holdTimeoutRef.current);
+            holdTimeoutRef.current = null;
+        }
+    }, []);
+
+    const startHoldMusic = useCallback(() => {
+        if (!holdAudioRef.current) return;
+        holdAudioRef.current.pause();
+        holdAudioRef.current.currentTime = 0;
+        holdAudioRef.current.volume = 0.15;
+        holdAudioRef.current.loop = true;
+        holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
+        clearHoldTimeout();
+        holdTimeoutRef.current = window.setTimeout(() => {
+            if (holdAudioRef.current) {
+                holdAudioRef.current.pause();
+                holdAudioRef.current.currentTime = 0;
+            }
+        }, 15000);
+    }, [clearHoldTimeout]);
+
+    const stopHoldMusic = useCallback(() => {
+        clearHoldTimeout();
+        if (holdAudioRef.current) {
+            holdAudioRef.current.pause();
+            holdAudioRef.current.currentTime = 0;
+        }
+    }, [clearHoldTimeout]);
+
     useEffect(() => {
         holdAudioRef.current = new Audio(AUDIO_ASSETS.hold);
-        holdAudioRef.current.volume = 0.25;
+        holdAudioRef.current.volume = 0.15;
 
         const loadDependencies = async () => {
             setIsLoading(true);
@@ -157,10 +189,10 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
             if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
             callTimersRef.current.forEach(window.clearTimeout);
             endSession();
-            holdAudioRef.current?.pause();
+            stopHoldMusic();
             audioRef.current.pause();
         };
-    }, [template, endSession]);
+    }, [template, endSession, stopHoldMusic]);
 
     const startTimer = useCallback(() => {
         if (durationIntervalRef.current) clearInterval(durationIntervalRef.current);
@@ -190,10 +222,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
     const startAylaSequence = useCallback(async () => {
         if (!agent) return;
 
-        if (holdAudioRef.current) {
-            holdAudioRef.current.pause();
-            holdAudioRef.current.currentTime = 0;
-        }
+        stopHoldMusic();
 
         setCallState('connectingAgent');
 
@@ -233,17 +262,16 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
         pauseMicrophoneStream();
         const originalCallState = callState;
         setCallState('onHold');
-        holdAudioRef.current?.play();
+        startHoldMusic();
         const holdDuration = Math.random() * (15000 - 8000) + 8000; 
 
         const holdTimer = window.setTimeout(() => {
-            holdAudioRef.current?.pause();
-            if (holdAudioRef.current) holdAudioRef.current.currentTime = 0;
+            stopHoldMusic();
             setCallState(originalCallState);
             resumeMicrophoneStream();
         }, holdDuration);
         callTimersRef.current.push(holdTimer);
-    }, [pauseMicrophoneStream, resumeMicrophoneStream, callState]);
+    }, [pauseMicrophoneStream, resumeMicrophoneStream, callState, startHoldMusic, stopHoldMusic]);
 
     useEffect(() => {
         const lastTranscript = combinedTranscripts[combinedTranscripts.length - 1];
@@ -277,10 +305,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
 
 
     const handleDialpadPress = useCallback((key: string) => {
-        if (holdAudioRef.current) {
-            holdAudioRef.current.pause();
-            holdAudioRef.current.currentTime = 0;
-        }
+        stopHoldMusic();
 
         if (callState === 'awaitingLanguageInput') {
            switch(key) {
@@ -288,10 +313,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
                    setCallState('playingDepartmentMenu');
                    playTtsPrompt(DEPARTMENT_MENU_PROMPT, () => {
                        setCallState('awaitingDepartmentInput');
-                       if (holdAudioRef.current) {
-                            holdAudioRef.current.loop = true;
-                            holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
-                        }
+                       startHoldMusic();
                    });
                    break;
                case '2': // Turkish -> Connect to agent
@@ -307,9 +329,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
                    });
                    break; 
                default: // Invalid input, keep waiting
-                   if (holdAudioRef.current) {
-                       holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
-                   }
+                   startHoldMusic();
                    break;
            }
         } else if (callState === 'awaitingDepartmentInput') {
@@ -328,16 +348,11 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
                     setCallState('playingLanguageMenu');
                     playTtsPrompt(LANGUAGE_MENU_PROMPT, () => {
                         setCallState('awaitingLanguageInput');
-                        if (holdAudioRef.current) {
-                            holdAudioRef.current.loop = true;
-                            holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
-                        }
+                        startHoldMusic();
                     });
                     return;
                 default:
-                    if (holdAudioRef.current) {
-                       holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
-                    }
+                    startHoldMusic();
                     return;
             }
 
@@ -348,7 +363,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
                 });
             }
         }
-    }, [callState, startAylaSequence, playTtsPrompt]);
+    }, [callState, startAylaSequence, playTtsPrompt, startHoldMusic, stopHoldMusic]);
 
     const handleStartCall = () => {
         if (callState !== 'idle' || !agent) return;
@@ -368,10 +383,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
                 setCallState('playingLanguageMenu');
                 await playTtsPrompt(LANGUAGE_MENU_PROMPT, () => {
                     setCallState('awaitingLanguageInput');
-                    if (holdAudioRef.current) {
-                        holdAudioRef.current.loop = true;
-                        holdAudioRef.current.play().catch(e => console.error("Hold audio failed to play", e));
-                    }
+                    startHoldMusic();
                 });
             }, 8000);
             callTimersRef.current.push(ringTimer);
@@ -386,7 +398,7 @@ const WebDemoView: React.FC<WebDemoViewProps> = ({ template, onEndDemo }) => {
             audioRef.current.pause();
             audioRef.current.currentTime = 0;
         }
-        holdAudioRef.current?.pause();
+        stopHoldMusic();
         endSession();
         onEndDemo();
     };
