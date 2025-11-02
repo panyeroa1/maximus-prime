@@ -1,0 +1,30 @@
+{
+  "status": "success",
+  "total_count": 1,
+  "count": 1,
+  "calls": [
+    {
+      "call_id": "demo-call-001",
+      "created_at": "2025-01-15T10:00:00Z",
+      "updated_at": "2025-01-15T10:05:00Z",
+      "call_length": 300,
+      "to": "+10000000000",
+      "from": "+19999999999",
+      "inbound": false,
+      "max_duration": 900,
+      "metadata": {},
+      "variables": {
+        "country": "US",
+        "language": "en-US",
+        "timezone": "America/New_York"
+      },
+      "record": true,
+      "recording_url": "https://example.com/recordings/demo-call-001",
+      "summary": "Sample call log for local development.",
+      "analysis": {
+        "sentiment": "neutral"
+      },
+      "status": "completed"
+    }
+  ]
+}

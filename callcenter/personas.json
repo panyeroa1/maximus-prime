@@ -1,0 +1,29 @@
+{
+  "data": [
+    {
+      "id": "persona-demo-001",
+      "name": "Eburon Support",
+      "role": "Customer Support",
+      "description": "Demo persona used for local development.",
+      "tags": [
+        "Support"
+      ],
+      "image_url": null,
+      "created_at": "2025-01-01T00:00:00Z",
+      "updated_at": "2025-01-01T00:00:00Z",
+      "deleted_at": null,
+      "user_id": "demo-user",
+      "current_production_version_id": "persona-version-demo",
+      "current_draft_version_id": "persona-version-demo",
+      "inbound_numbers": [],
+      "current_production_version": {
+        "id": "persona-version-demo",
+        "persona_id": "persona-demo-001",
+        "version_type": "production",
+        "version_number": 1,
+        "personality_prompt": "You are an Eburon support specialist."
+      },
+      "current_draft_version": null
+    }
+  ]
+}

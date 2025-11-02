@@ -1,0 +1,8 @@
+{
+  "name": "voicedemo",
+  "description": "A secure, brand-controlled platform for designing, testing, and managing Customer Service Voice Agents. Build, test, and deploy with a powerful suite of tools and advanced AI.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}
