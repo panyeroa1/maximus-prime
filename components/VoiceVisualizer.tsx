@@ -1,3 +1,4 @@
+// FIX: Removed invalid file header.
 import React from 'react';
 
 interface VoiceVisualizerProps {
@@ -16,30 +17,30 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
         className={`absolute w-full h-full rounded-full transition-all duration-500 ease-in-out ${isSpeaking ? 'animate-speaking-glow' : ''}`}
         style={!isSpeaking ? {
           boxShadow: isActive
-            ? '0 0 50px 15px rgba(59, 130, 246, 0.3), 0 0 90px 30px rgba(147, 197, 253, 0.2)'
+            ? '0 0 60px 20px rgba(59, 130, 246, 0.25), 0 0 100px 35px rgba(147, 197, 253, 0.15)'
             : '0 0 30px 10px rgba(59, 130, 246, 0.2), 0 0 60px 20px rgba(147, 197, 253, 0.1)',
         } : {}}
       />
       
-      {/* Main Orb - pulses when AI is speaking */}
+      {/* Main Orb - pulses gently, scales up smoothly when speaking */}
       <div
-        className={`w-full h-full rounded-full overflow-hidden transition-transform duration-500 ease-in-out ${
-          isSpeaking ? 'animate-speaking-pulse' : 'animate-pulse-gentle'
+        className={`w-full h-full rounded-full overflow-hidden animate-pulse-gentle transition-transform duration-700 ease-in-out ${
+          isSpeaking ? 'scale-[1.03]' : ''
         }`}
       >
         <div className="relative w-full h-full bg-black">
            {/* Base blue */}
            <div className="absolute inset-0 rounded-full bg-gradient-to-br from-blue-600 to-blue-900"></div>
            
-           {/* Cloudy texture 1 - spins faster when speaking */}
-           <div className={`absolute inset-0 rounded-full opacity-60 mix-blend-screen ${isSpeaking ? 'animate-cloud-spin-fast' : 'animate-cloud-spin-slow'}`}>
+           {/* Cloudy texture 1 */}
+           <div className={`absolute inset-0 rounded-full opacity-60 mix-blend-screen animate-cloud-spin-slow`}>
                 <div className="w-full h-full" style={{
                     background: 'radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.8) 0%, rgba(200, 220, 255, 0.6) 20%, rgba(100, 150, 255, 0) 50%)'
                 }}></div>
            </div>
            
-           {/* Cloudy texture 2 - spins very fast when speaking */}
-           <div className={`absolute inset-0 rounded-full opacity-50 mix-blend-plus-lighter ${isSpeaking ? 'animate-cloud-spin-very-fast' : 'animate-cloud-spin-fast'}`}>
+           {/* Cloudy texture 2 */}
+           <div className={`absolute inset-0 rounded-full opacity-50 mix-blend-plus-lighter animate-cloud-spin-fast`}>
                 <div className="w-full h-full" style={{
                     background: 'radial-gradient(circle at 70% 80%, rgba(220, 230, 255, 0.7) 0%, rgba(180, 200, 255, 0.5) 25%, rgba(100, 150, 255, 0) 60%)'
                 }}></div>
@@ -68,25 +69,18 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
         {`
           @keyframes pulse-gentle {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-          }
-          @keyframes speaking-pulse {
-            0%, 100% { transform: scale(1.02); }
-            50% { transform: scale(1.04); }
+            50% { transform: scale(1.015); }
           }
           .animate-pulse-gentle {
-            animation: pulse-gentle 5s infinite ease-in-out;
-          }
-          .animate-speaking-pulse {
-            animation: speaking-pulse 2.2s infinite ease-in-out;
+            animation: pulse-gentle 8s infinite ease-in-out;
           }
           
           @keyframes speaking-glow {
             0%, 100% {
-              box-shadow: 0 0 50px 15px rgba(59, 130, 246, 0.3), 0 0 90px 30px rgba(147, 197, 253, 0.2);
+              box-shadow: 0 0 60px 20px rgba(59, 130, 246, 0.25), 0 0 100px 35px rgba(147, 197, 253, 0.15);
             }
             50% {
-              box-shadow: 0 0 65px 20px rgba(59, 130, 246, 0.4), 0 0 110px 40px rgba(147, 197, 253, 0.3);
+              box-shadow: 0 0 60px 20px rgba(59, 130, 246, 0.3), 0 0 100px 35px rgba(147, 197, 253, 0.2);
             }
           }
           .animate-speaking-glow {
@@ -94,25 +88,18 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
           }
 
           @keyframes cloud-spin-slow {
-            0% { transform: rotate(0deg) scale(1.2); }
-            100% { transform: rotate(360deg) scale(1.2); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
           }
           @keyframes cloud-spin-fast {
-            0% { transform: rotate(0deg) scale(1.3); }
-            100% { transform: rotate(360deg) scale(1.3); }
-          }
-          @keyframes cloud-spin-very-fast {
-            0% { transform: rotate(0deg) scale(1.4); }
-            100% { transform: rotate(-360deg) scale(1.4); }
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(-360deg); }
           }
           .animate-cloud-spin-slow {
             animation: cloud-spin-slow 45s linear infinite;
           }
           .animate-cloud-spin-fast {
-            animation: cloud-spin-fast 20s linear infinite;
-          }
-          .animate-cloud-spin-very-fast {
-            animation: cloud-spin-very-fast 15s linear infinite;
+            animation: cloud-spin-fast 30s linear infinite;
           }
 
           @keyframes mic-ripple {

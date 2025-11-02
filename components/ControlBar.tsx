@@ -1,6 +1,6 @@
-
+// FIX: Removed invalid file header.
 import React from 'react';
-import { MicrophoneIcon, SparklesIcon, HandThumbUpIcon, XMarkIcon } from './icons';
+import { MicrophoneIcon, SparklesIcon, HandThumbUpIcon, XMarkIcon, ArrowUturnRightIcon } from './icons';
 
 interface ControlBarProps {
   isRecording: boolean;
@@ -8,6 +8,7 @@ interface ControlBarProps {
   onHangUp: () => void;
   onShowActions: () => void;
   onOpenFeedback: () => void;
+  onSkipTurn: () => void;
 }
 
 export const ControlBar: React.FC<ControlBarProps> = ({
@@ -16,6 +17,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   onHangUp,
   onShowActions,
   onOpenFeedback,
+  onSkipTurn,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-center items-center z-20">
@@ -45,6 +47,15 @@ export const ControlBar: React.FC<ControlBarProps> = ({
           aria-label="Send Feedback"
         >
           <HandThumbUpIcon className="w-8 h-8 text-white" />
+        </button>
+
+        {/* Skip Turn Button */}
+        <button
+          onClick={onSkipTurn}
+          className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
+          aria-label="Skip Turn"
+        >
+          <ArrowUturnRightIcon className="w-8 h-8 text-white" />
         </button>
 
         {/* Hang Up Button */}

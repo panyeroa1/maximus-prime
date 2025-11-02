@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 import { FunctionDeclaration, Type } from '@google/genai';
 import { Tool } from '../types';
 

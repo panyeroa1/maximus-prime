@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 export function decode(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;

@@ -1,6 +1,6 @@
+// FIX: Removed invalid file header.
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-// Fix: Correct import path.
 import App from './App';
 
 const rootElement = document.getElementById('root');

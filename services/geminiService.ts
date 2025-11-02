@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 import { GoogleGenAI, LiveCallbacks, Modality, FunctionDeclaration, GenerateContentResponse } from '@google/genai';
 import { ALL_TOOLS } from '../constants/tools';
 import { AppSettings } from '../types';

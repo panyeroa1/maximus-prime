@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 import React from 'react';
 import { ToolOutput } from '../types';
 import { XMarkIcon, SparklesIcon } from './icons';
@@ -38,4 +38,17 @@ export const ToolOutputCard: React.FC<ToolOutputCardProps> = ({ output, onRemove
     <div className="bg-neutral-800/60 border border-neutral-700 rounded-lg overflow-hidden animate-slide-in">
       <div className="flex justify-between items-center p-2 bg-neutral-900/40 border-b border-neutral-700">
         <div className="flex items-center gap-2">
-          <SparklesIcon className="w-4 h-4 text-blue-40...
+          <SparklesIcon className="w-4 h-4 text-blue-400" />
+          <h3 className="text-sm font-semibold">{title}</h3>
+        </div>
+        <button onClick={() => onRemove(id)} className="p-1 text-neutral-500 hover:text-white hover:bg-neutral-700 rounded-full">
+          <XMarkIcon className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="p-3">
+        {content.prompt && <p className="text-xs text-neutral-400 italic mb-2">"{content.prompt}"</p>}
+        {renderContent(content)}
+      </div>
+    </div>
+  );
+};

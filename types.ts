@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file headers.
 import { FunctionDeclaration } from '@google/genai';
 
 export interface ConversationTurn {
@@ -28,6 +28,7 @@ export interface ToolSettings {
 }
 
 export type VoiceEmotion = 'neutral' | 'happy' | 'sad' | 'angry';
+export type CallerPersona = 'Neutral' | 'Anxious' | 'Frustrated' | 'Tired' | 'Cheerful';
 
 export interface AppSettings {
   systemInstruction: string;
@@ -35,6 +36,7 @@ export interface AppSettings {
   rate: number;
   pitch: number;
   emotion: VoiceEmotion;
+  callerPersona: CallerPersona;
   enabledTools: string[];
   serverSettings: ServerSettings;
   toolSettings: ToolSettings;
@@ -82,4 +84,30 @@ export interface WorkspaceState {
   toolOutputs: ToolOutput[];
   message: string;
   uploadAction?: UploadAction;
+}
+
+// Dialer Page Types
+export type CallState = 'keypad' | 'ringing' | 'connected' | 'on-hold' | 'summary';
+
+export interface CallTranscriptEntry {
+  speaker: 'ivr' | 'agent' | 'user' | 'system';
+  text: string;
+}
+
+export type CallType = 'outgoing' | 'incoming' | 'missed';
+
+export interface CallHistoryEntry {
+  id: string;
+  contactName: string;
+  number: string;
+  type: CallType;
+  timestamp: number; // Date.now()
+  duration: number; // in seconds
+}
+
+export interface Contact {
+  id: string;
+  firstName: string;
+  lastName: string;
+  number: string;
 }

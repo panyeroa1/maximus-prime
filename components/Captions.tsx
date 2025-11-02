@@ -1,3 +1,4 @@
+// FIX: Removed invalid file header.
 import React, { useEffect, useRef } from 'react';
 import { ConversationTurn } from '../types';
 

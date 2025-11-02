@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 import React, { useRef, FormEvent, useState, useEffect } from 'react';
 // Fix: Import UploadAction type.
 import { WorkspaceState, MediaAction, WorkspaceContent, ToolOutput, UploadAction } from '../types';

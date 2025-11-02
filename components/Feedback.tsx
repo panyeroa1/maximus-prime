@@ -1,4 +1,4 @@
-
+// FIX: Removed invalid file header.
 import React, { useState } from 'react';
 import { XMarkIcon } from './icons';
 

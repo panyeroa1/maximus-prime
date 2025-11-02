@@ -1,5 +1,4 @@
-
-
+// FIX: Removed invalid file header.
 import {
   generateImage,
   generateProText,
