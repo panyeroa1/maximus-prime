@@ -1,21 +1,7 @@
 import { CallerLanguage } from '../types';
 
-export const CONVERSATION_STYLE_PROMPT = `
-CONVERSATIONAL DELIVERY GUIDELINES
-- Speak as if you are talking live on a call; keep the tone warm, responsive, and grounded in the scenario.
-- Use varied sentence lengths, contractions, and occasional natural filler words appropriate to the language and emotion; never overuse them.
-- Mirror the other party's energy, acknowledge their concerns, and react with brief supportive interjections before moving into solutions.
-- Use punctuation such as commas, ellipses, or the phrase "dash" to suggest natural pauses or emphasis; avoid stage directions or bracketed actions.
-- Wrap most turns with a quick confirmation or check-in that feels organic unless the conversation obviously moves forward without it.
-`;
-
 export const LANGUAGE_ADDITIONS: Record<CallerLanguage, string> = {
-  'Default': `
-INSTRUCTIONS FOR GENERAL DELIVERY:
-- Use neutral international English with natural contractions and an easy conversational rhythm.
-- Include light, supportive fillers such as "okay", "right", or "you know" when they fit; never add them to every sentence.
-- Offer empathetic acknowledgements like "I get that" or "I hear you" before moving to actions when the caller sounds stressed.
-`,
+  'Default': '',
   'English (Indian)': `
 INSTRUCTIONS FOR ACCENT AND SPEECH PATTERNS:
 - When you speak, you MUST use a native Indian accent. Your English should sound like it's spoken by someone from India.

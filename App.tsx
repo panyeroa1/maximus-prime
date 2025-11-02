@@ -12,7 +12,7 @@ import { decode, encode, decodeAudioData } from './services/audioUtils';
 import * as geminiService from './services/geminiService';
 import { executeTool } from './services/subAgentService';
 import { AppSettings, ConversationTurn, WorkspaceState, ActiveToolCall, WorkspaceContent, MediaAction, UploadAction } from './types';
-import { CONVERSATION_STYLE_PROMPT, LANGUAGE_ADDITIONS } from './constants/prompts';
+import { LANGUAGE_ADDITIONS } from './constants/prompts';
 
 const DEFAULT_SETTINGS: AppSettings = {
   voice: 'Charon',
@@ -399,14 +399,7 @@ const App: React.FC = () => {
             },
         };
 
-        const finalSystemInstruction = [
-          settings.systemInstruction,
-          CONVERSATION_STYLE_PROMPT,
-          LANGUAGE_ADDITIONS[settings.language] ?? '',
-        ]
-          .map(section => section.trim())
-          .filter(section => section.length > 0)
-          .join('\n\n');
+        const finalSystemInstruction = `${settings.systemInstruction}\n\n${LANGUAGE_ADDITIONS[settings.language] || ''}`;
         const finalSettings = { ...settings, systemInstruction: finalSystemInstruction };
 
         sessionPromiseRef.current = geminiService.startLiveSession(finalSettings, callbacks);
