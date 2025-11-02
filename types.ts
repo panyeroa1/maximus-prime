@@ -29,14 +29,37 @@ export interface ToolSettings {
 
 export type VoiceEmotion = 'neutral' | 'happy' | 'sad' | 'angry';
 export type CallerPersona = 'Neutral' | 'Anxious' | 'Frustrated' | 'Tired' | 'Cheerful';
+export type CallerLanguage =
+  | 'English (US)'
+  | 'English (UK)'
+  | 'English (Australian)'
+  | 'English (Indian)'
+  | 'English (Arabic Native)'
+  | 'Spanish (Spain)'
+  | 'Spanish (Mexican)'
+  | 'French (France)'
+  | 'German'
+  | 'Mandarin Chinese';
+
+export interface SystemPrompt {
+  role: string;
+  primaryGoals: string;
+  voiceCadence: string;
+  emotionalStance: string;
+  interactionRules: string;
+  behavioralFlow: string;
+  additionalInstructions: string;
+}
 
 export interface AppSettings {
+  systemPromptParts: SystemPrompt;
   systemInstruction: string;
   voice: string;
   rate: number;
   pitch: number;
   emotion: VoiceEmotion;
   callerPersona: CallerPersona;
+  language: CallerLanguage;
   enabledTools: string[];
   serverSettings: ServerSettings;
   toolSettings: ToolSettings;

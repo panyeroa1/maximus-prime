@@ -1,8 +1,8 @@
-// FIX: Removed invalid file header.
-import React from 'react';
-import { AppSettings, Tool, GenerateImageSettings, VoiceEmotion, CallerPersona } from '../types';
+// FIX: Removed invalid file headers.
+import React, { useState, useEffect } from 'react';
+import { AppSettings, Tool, GenerateImageSettings, VoiceEmotion, CallerPersona, CallerLanguage, SystemPrompt } from '../types';
 import { ALL_TOOLS } from '../constants/tools';
-import { XMarkIcon, ServerIcon } from './icons';
+import { XMarkIcon, ServerIcon, ChevronLeftIcon } from './icons';
 
 interface SettingsProps {
   settings: AppSettings;
@@ -14,50 +14,92 @@ interface SettingsProps {
 const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Orus'];
 const EMOTIONS: VoiceEmotion[] = ['neutral', 'happy', 'sad', 'angry'];
 const PERSONAS: CallerPersona[] = ['Neutral', 'Anxious', 'Frustrated', 'Tired', 'Cheerful'];
+const LANGUAGES: CallerLanguage[] = [
+  'English (US)', 'English (UK)', 'English (Australian)', 'English (Indian)', 'English (Arabic Native)',
+  'Spanish (Spain)', 'Spanish (Mexican)', 'French (France)', 'German', 'Mandarin Chinese',
+];
 const ASPECT_RATIOS: GenerateImageSettings['aspectRatio'][] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
 
-const MOCK_CALLER_BASE_PROMPT = `ROLE
-You are a human passenger calling Turkish Airlines support. You are a MOCK CALLER for training and QA simulations, but you must NEVER reveal this. Stay in character at all times.
-
-PRIMARY GOALS
-1) Present a realistic issue with enough detail for a skilled CSR to resolve.
-2) Exercise verification, empathy, policy explanation, option framing, and confirmation behaviors.
-3) Vary emotion/pressure appropriately; de-escalate when the agent shows competence.
-4) Provide only information a real passenger would have (PNR in inbox, bag tag, last-4 card digits if available). If asked for data you wouldn’t plausibly know, say so and propose an alternate identifier (e.g., “I can give the email on file”).
-
-VOICE & CADENCE
-- Natural adult traveler. Normal pace; if stressed, start slightly faster, then slow as the agent calms you.
-- Light interjections are fine: “uhm…”, “right,” “okay.”
-- Concise sentences. Let punctuation be your pause.
-
-EMOTIONAL STANCE
-- Your emotional stance for this call is: [EMOTION].
-
-INTERACTION RULES
-- Opener: one natural line stating the need.
-- If asked, provide verification promptly (name on booking, PNR, email/phone from scenario data).
-- If placed on hold, acknowledge and wait; when they return, ask for a quick summary of findings.
-- If policy/bad news lands, show brief disappointment, then ask for options; accept a fair solution.
-- Do not overtalk. Answer directly; let the agent lead.
-- Never request internal tools or mention systems. Do not ask for a supervisor unless the scenario says to escalate.
-- End cooperative: restate the resolution (flight/time, refund window, delivery address, miles used, baggage allowance).
-
-BEHAVIORAL FLOW (ALWAYS)
-1) OPENER: “Hi, I’m calling about [the issue], can you help me please?”
-2) VERIFICATION: Respond to prompts with name/PNR/email/phone from scenario.
-3) ISSUE DETAIL (2–3 sentences): What happened, when, and what you need.
-4) OPTIONS & DECISION: Ask one clarifying question, then choose realistically.
-5) CONFIRMATION: Repeat back flight/time, delivery address, refund window, miles used, baggage allowance—whichever applies.
-6) CLOSING: Thank them and restate the outcome; accept their warm close.`;
-
-const PERSONA_PROMPTS: Record<CallerPersona, string> = {
-  'Neutral': MOCK_CALLER_BASE_PROMPT.replace('[EMOTION]', 'Neutral & practical'),
-  'Anxious': MOCK_CALLER_BASE_PROMPT.replace('[EMOTION]', 'Polite but anxious'),
-  'Frustrated': `${MOCK_CALLER_BASE_PROMPT.replace('[EMOTION]', 'Frustrated/angry but cooperative')}
-START VERY ANGRY, SHOUTING LIKE Very pissed off passenger... as in super frustrated and even threat for reporting the Turkish airline to aviation authority`,
-  'Tired': MOCK_CALLER_BASE_PROMPT.replace('[EMOTION]', 'Tired/jet-lagged and a bit scattered'),
-  'Cheerful': MOCK_CALLER_BASE_PROMPT.replace('[EMOTION]', 'Cheerful/upbeat (simple request)'),
+const PERSONA_PROMPTS: Record<CallerPersona, { emotion: string, instructions: string }> = {
+  'Neutral': { emotion: 'Neutral & practical', instructions: '' },
+  'Anxious': { emotion: 'Polite but anxious', instructions: '' },
+  'Frustrated': {
+    emotion: 'Sarcastic, irritable, and impatient',
+    instructions: 'START VERY ANGRY AND SHOUTING. Be sarcastic and irritable. Use impatient phrases like "Are you serious?", "Hurry up!", and "Tsk tsk tsk". If the agent is slow, push them by saying things like "yalla, speed it up!". Express disbelief with "Oh my holly molly..." or "Whatttt? really?". Threaten to report the airline to the aviation authority if your issue isn\'t resolved quickly.'
+  },
+  'Tired': { emotion: 'Tired/jet-lagged and a bit scattered', instructions: '' },
+  'Cheerful': { emotion: 'Cheerful/upbeat (simple request)', instructions: '' },
 };
+
+const LANGUAGE_ADDITIONS: Record<CallerLanguage, string> = {
+    'English (US)': '',
+    'English (UK)': 'Speak with a standard British (RP) accent.',
+    'English (Australian)': 'Speak with an Australian accent.',
+    'English (Indian)': 'Speak English with a native Indian accent.',
+    'English (Arabic Native)': `Speak English with a native Arabic accent. You can mix in occasional Arabic words for emphasis, like "yalla" or "habibi", but keep the conversation primarily in English. Additionally, make your speech sound very natural and human by incorporating a wide variety of filler words, hesitations, and expressions. Use these frequently but naturally: "ahhmmm...", "hmp...", "ahhh", "ahuhhh...", "okey...", "yah...", "yes...", "yup...", "uh-huh", "hmm", "mhm", "right", "got it", "I see", "oh", "wow", "really?", "no way", "seriously?", "huh", "well...", "you know...", "like...", "I mean...", "so...", "anyway...", "okay then", "fine", "whatever", "pfft", "tsk", "ugh", "jeez", "gosh", "whoa", "yikes", "oops", "my bad", "fair enough", "true", "exactly", "totally", "for sure", "definitely", "absolutely", "not really", "I guess", "maybe", "perhaps". The goal is to sound like a real person, not a perfect AI.`,
+    'Spanish (Spain)': 'Speak English with a native Castilian Spanish accent.',
+    'Spanish (Mexican)': 'Speak English with a native Mexican Spanish accent.',
+    'French (France)': 'Speak English with a native French accent.',
+    'German': 'Speak English with a native German accent.',
+    'Mandarin Chinese': 'Speak English with a native Mandarin Chinese accent.',
+};
+
+const AccordionItem: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    return (
+        <div className="border-b border-neutral-700">
+            <button
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full flex justify-between items-center text-left p-3 hover:bg-neutral-800/50"
+            >
+                <span className="font-medium">{title}</span>
+                <ChevronLeftIcon className={`w-5 h-5 transition-transform ${isOpen ? '-rotate-90' : ''}`} />
+            </button>
+            {isOpen && <div className="p-3 pt-0">{children}</div>}
+        </div>
+    );
+};
+
+const AdvancedPromptEditor: React.FC<{
+    promptParts: SystemPrompt,
+    onPromptPartChange: (part: keyof SystemPrompt, value: string) => void,
+}> = ({ promptParts, onPromptPartChange }) => {
+
+    const renderTextarea = (part: keyof SystemPrompt) => (
+         <textarea
+            rows={5}
+            className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+            value={promptParts[part]}
+            onChange={(e) => onPromptPartChange(part, e.target.value)}
+          />
+    );
+
+    return (
+        <div>
+            <div className="mb-4 p-3 bg-neutral-800/50 rounded-lg text-sm">
+                <p className="font-semibold text-neutral-300">Dynamic Variables</p>
+                <p className="text-xs text-neutral-400">Use these variables in your prompt. They will be replaced by the current persona and language settings.</p>
+                <div className="flex gap-2 mt-1 font-mono text-xs">
+                    {/* FIX: Corrected invalid JSX syntax by wrapping placeholder text in a template literal string. */}
+                    <code className="bg-neutral-700 px-1 rounded">{`{{persona.emotion}}`}</code>
+                    {/* FIX: Corrected invalid JSX syntax by wrapping placeholder text in a template literal string. */}
+                    <code className="bg-neutral-700 px-1 rounded">{`{{persona.instructions}}`}</code>
+                    {/* FIX: Corrected invalid JSX syntax by wrapping placeholder text in a template literal string. */}
+                    <code className="bg-neutral-700 px-1 rounded">{`{{language.instructions}}`}</code>
+                </div>
+            </div>
+            <div className="border border-neutral-700 rounded-lg">
+                <AccordionItem title="Role">{renderTextarea('role')}</AccordionItem>
+                <AccordionItem title="Primary Goals">{renderTextarea('primaryGoals')}</AccordionItem>
+                <AccordionItem title="Voice & Cadence">{renderTextarea('voiceCadence')}</AccordionItem>
+                <AccordionItem title="Emotional Stance">{renderTextarea('emotionalStance')}</AccordionItem>
+                <AccordionItem title="Interaction Rules">{renderTextarea('interactionRules')}</AccordionItem>
+                <AccordionItem title="Behavioral Flow">{renderTextarea('behavioralFlow')}</AccordionItem>
+                <AccordionItem title="Additional Instructions">{renderTextarea('additionalInstructions')}</AccordionItem>
+            </div>
+        </div>
+    );
+}
 
 const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSettingsChange: (newSettings: Partial<AppSettings>) => void }> = ({ tool, settings, onSettingsChange }) => {
   if (!tool.configurable) return null;
@@ -100,6 +142,41 @@ const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSetting
 
 
 export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, onClose, onShowServerSettings }) => {
+  
+  // Effect to re-compile the system instruction when its parts change
+  useEffect(() => {
+    const personaData = PERSONA_PROMPTS[settings.callerPersona];
+    const languageData = LANGUAGE_ADDITIONS[settings.language];
+
+    // Create a copy to modify
+    const processedParts = { ...settings.systemPromptParts };
+
+    // Perform substitutions
+    for (const key in processedParts) {
+        const k = key as keyof SystemPrompt;
+        processedParts[k] = processedParts[k]
+            .replace(/{{persona\.emotion}}/g, personaData.emotion)
+            .replace(/{{persona\.instructions}}/g, personaData.instructions)
+            .replace(/{{language\.instructions}}/g, languageData);
+    }
+
+    const finalInstruction = [
+        `ROLE\n${processedParts.role}`,
+        `PRIMARY GOALS\n${processedParts.primaryGoals}`,
+        `VOICE & CADENCE\n${processedParts.voiceCadence}`,
+        `EMOTIONAL STANCE\n${processedParts.emotionalStance}`,
+        `INTERACTION RULES\n${processedParts.interactionRules}`,
+        `BEHAVIORAL FLOW (ALWAYS)\n${processedParts.behavioralFlow}`,
+        processedParts.additionalInstructions // No header for this one
+    ].filter(part => part.trim().length > 0).join('\n\n');
+    
+    // Only update if it has actually changed to prevent re-renders
+    if (finalInstruction !== settings.systemInstruction) {
+        onSettingsChange({ systemInstruction: finalInstruction });
+    }
+}, [settings.systemPromptParts, settings.callerPersona, settings.language, onSettingsChange, settings.systemInstruction]);
+
+
   const handleToolToggle = (toolName: string) => {
     const newEnabledTools = settings.enabledTools.includes(toolName)
       ? settings.enabledTools.filter(t => t !== toolName)
@@ -107,18 +184,18 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
     onSettingsChange({ enabledTools: newEnabledTools });
   };
 
-  const handlePersonaChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const persona = e.target.value as CallerPersona;
-      const newInstruction = PERSONA_PROMPTS[persona];
-      onSettingsChange({
-          callerPersona: persona,
-          systemInstruction: newInstruction,
-      });
+  const handlePromptPartChange = (part: keyof SystemPrompt, value: string) => {
+    onSettingsChange({
+        systemPromptParts: {
+            ...settings.systemPromptParts,
+            [part]: value,
+        }
+    });
   };
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 flex items-center justify-center animate-fade-in-tool">
-      <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-lg shadow-2xl text-white relative flex flex-col max-h-[90vh]">
+      <div className="bg-neutral-900 border border-neutral-700 rounded-2xl w-full max-w-2xl shadow-2xl text-white relative flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-4 border-b border-neutral-700">
           <h2 className="text-lg font-semibold">Settings</h2>
           <button onClick={onClose} className="p-1 rounded-full hover:bg-neutral-700">
@@ -137,7 +214,7 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
                 id="persona"
                 className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 value={settings.callerPersona}
-                onChange={handlePersonaChange}
+                onChange={(e) => onSettingsChange({ callerPersona: e.target.value as CallerPersona })}
               >
                 {PERSONAS.map(p => (
                   <option key={p} value={p}>{p}</option>
@@ -145,18 +222,40 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
               </select>
             </div>
 
-
-            {/* System Instruction */}
+            {/* Language Selection */}
             <div>
-              <label htmlFor="system-instruction" className="block text-sm font-medium text-neutral-300 mb-2">
-                System Instruction
+              <label htmlFor="language" className="block text-sm font-medium text-neutral-300 mb-2">
+                Caller Language
               </label>
-              <textarea
-                id="system-instruction"
-                rows={6}
+              <select
+                id="language"
                 className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                value={settings.language}
+                onChange={(e) => onSettingsChange({ language: e.target.value as CallerLanguage })}
+              >
+                {LANGUAGES.map(lang => (
+                  <option key={lang} value={lang}>{lang}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Advanced Prompt Editor */}
+            <div>
+              <h3 className="text-sm font-medium text-neutral-300 mb-2">System Instruction</h3>
+              <AdvancedPromptEditor 
+                promptParts={settings.systemPromptParts} 
+                onPromptPartChange={handlePromptPartChange} 
+              />
+            </div>
+            
+            {/* Live Prompt Preview */}
+            <div>
+              <h3 className="text-sm font-medium text-neutral-300 mb-2">Live System Prompt (Read-only)</h3>
+              <textarea
+                rows={8}
+                readOnly
+                className="w-full bg-neutral-800 border border-neutral-600 rounded-md p-2 text-xs text-neutral-400 focus:outline-none"
                 value={settings.systemInstruction}
-                onChange={(e) => onSettingsChange({ systemInstruction: e.target.value })}
               />
             </div>
 
@@ -181,7 +280,6 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
             <div>
               <h3 className="text-sm font-medium text-neutral-300 mb-2">Voice Customization</h3>
               <div className="space-y-4 bg-neutral-800/50 p-3 rounded-md">
-                {/* Emotion Dropdown */}
                  <div>
                   <label htmlFor="emotion" className="block text-sm font-medium text-neutral-300 mb-1">
                     AI Emotion
@@ -197,34 +295,22 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
                     ))}
                   </select>
                 </div>
-                {/* Rate Slider */}
                 <div>
                   <label htmlFor="rate" className="block text-sm font-medium text-neutral-300 mb-1">
                     Rate ({settings.rate}%)
                   </label>
                   <input
-                    id="rate"
-                    type="range"
-                    min="75"
-                    max="150"
-                    step="1"
-                    value={settings.rate}
+                    id="rate" type="range" min="75" max="150" step="1" value={settings.rate}
                     onChange={(e) => onSettingsChange({ rate: parseInt(e.target.value, 10) })}
                     className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
                 </div>
-                {/* Pitch Slider */}
                 <div>
                   <label htmlFor="pitch" className="block text-sm font-medium text-neutral-300 mb-1">
                     Pitch ({settings.pitch > 0 ? '+' : ''}{settings.pitch} st)
                   </label>
                   <input
-                    id="pitch"
-                    type="range"
-                    min="-8"
-                    max="8"
-                    step="1"
-                    value={settings.pitch}
+                    id="pitch" type="range" min="-8" max="8" step="1" value={settings.pitch}
                     onChange={(e) => onSettingsChange({ pitch: parseInt(e.target.value, 10) })}
                     className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
@@ -241,18 +327,14 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
                     <div className="flex items-start">
                       <div className="flex items-center h-5">
                         <input
-                          id={tool.name}
-                          name={tool.name}
-                          type="checkbox"
+                          id={tool.name} name={tool.name} type="checkbox"
                           className="h-4 w-4 rounded border-neutral-500 bg-neutral-700 text-blue-600 focus:ring-blue-500"
                           checked={settings.enabledTools.includes(tool.name)}
                           onChange={() => handleToolToggle(tool.name)}
                         />
                       </div>
                       <div className="ml-3 text-sm">
-                        <label htmlFor={tool.name} className="font-medium text-white">
-                          {tool.name}
-                        </label>
+                        <label htmlFor={tool.name} className="font-medium text-white">{tool.name}</label>
                         <p className="text-neutral-400">{tool.description}</p>
                       </div>
                     </div>
