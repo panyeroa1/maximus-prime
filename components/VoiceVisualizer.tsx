@@ -16,9 +16,8 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
         className={`absolute w-full h-full rounded-full transition-all duration-500 ease-in-out ${isSpeaking ? 'animate-speaking-glow' : ''}`}
         style={!isSpeaking ? {
           boxShadow: isActive
-            ? '0 0 60px 20px rgba(59, 130, 246, 0.5), 0 0 100px 40px rgba(147, 197, 253, 0.3)'
-            : '0 0 30px 10px rgba(59, 130, 246, 0.4), 0 0 60px 20px rgba(147, 197, 253, 0.2)',
-          transform: isActive ? 'scale(1.1)' : 'scale(1.0)',
+            ? '0 0 50px 15px rgba(59, 130, 246, 0.3), 0 0 90px 30px rgba(147, 197, 253, 0.2)'
+            : '0 0 30px 10px rgba(59, 130, 246, 0.2), 0 0 60px 20px rgba(147, 197, 253, 0.1)',
         } : {}}
       />
       
@@ -69,27 +68,25 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({ isRecording, i
         {`
           @keyframes pulse-gentle {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.03); }
+            50% { transform: scale(1.02); }
           }
           @keyframes speaking-pulse {
-            0%, 100% { transform: scale(1.05); }
-            50% { transform: scale(1.12); }
+            0%, 100% { transform: scale(1.02); }
+            50% { transform: scale(1.04); }
           }
           .animate-pulse-gentle {
             animation: pulse-gentle 5s infinite ease-in-out;
           }
           .animate-speaking-pulse {
-            animation: speaking-pulse 1.2s infinite ease-in-out;
+            animation: speaking-pulse 2.2s infinite ease-in-out;
           }
           
           @keyframes speaking-glow {
             0%, 100% {
-              transform: scale(1.1);
-              box-shadow: 0 0 60px 20px rgba(59, 130, 246, 0.5), 0 0 100px 40px rgba(147, 197, 253, 0.3);
+              box-shadow: 0 0 50px 15px rgba(59, 130, 246, 0.3), 0 0 90px 30px rgba(147, 197, 253, 0.2);
             }
             50% {
-              transform: scale(1.15);
-              box-shadow: 0 0 70px 30px rgba(59, 130, 246, 0.6), 0 0 120px 50px rgba(147, 197, 253, 0.4);
+              box-shadow: 0 0 65px 20px rgba(59, 130, 246, 0.4), 0 0 110px 40px rgba(147, 197, 253, 0.3);
             }
           }
           .animate-speaking-glow {
