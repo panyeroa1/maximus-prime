@@ -1,8 +1,10 @@
 
+
 import {
   generateImage,
   generateProText,
   analyzeTradingDataWithFlash,
+  summarizeText,
 } from './geminiService';
 import { ActiveToolCall, AppSettings, WorkspaceContent } from '../types';
 
@@ -30,6 +32,11 @@ export async function executeTool(toolCall: ActiveToolCall, settings: AppSetting
       case 'analyzeTradingData': {
         const result = await analyzeTradingDataWithFlash(toolCall.args.tradingData, toolCall.args.analysisPrompt);
         return { type: 'text', data: { text: result }, prompt: toolCall.args.analysisPrompt };
+      }
+
+      case 'summarizeText': {
+        const result = await summarizeText(toolCall.args.text);
+        return { type: 'text', data: { text: result }, prompt: 'Summary' };
       }
 
       default:

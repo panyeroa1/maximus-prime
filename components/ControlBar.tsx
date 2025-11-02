@@ -1,11 +1,13 @@
+
 import React from 'react';
-import { MicrophoneIcon, SparklesIcon, EllipsisHorizontalIcon, XMarkIcon } from './icons';
+import { MicrophoneIcon, SparklesIcon, HandThumbUpIcon, XMarkIcon } from './icons';
 
 interface ControlBarProps {
   isRecording: boolean;
   onToggleRecording: () => void;
   onHangUp: () => void;
   onShowActions: () => void;
+  onOpenFeedback: () => void;
 }
 
 export const ControlBar: React.FC<ControlBarProps> = ({
@@ -13,6 +15,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   onToggleRecording,
   onHangUp,
   onShowActions,
+  onOpenFeedback,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-center items-center z-20">
@@ -35,12 +38,13 @@ export const ControlBar: React.FC<ControlBarProps> = ({
           <MicrophoneIcon className="w-8 h-8 text-white" />
         </button>
 
-        {/* More Options Button */}
+        {/* Feedback Button */}
         <button
+          onClick={onOpenFeedback}
           className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
-          aria-label="More Options"
+          aria-label="Send Feedback"
         >
-          <EllipsisHorizontalIcon className="w-8 h-8 text-white" />
+          <HandThumbUpIcon className="w-8 h-8 text-white" />
         </button>
 
         {/* Hang Up Button */}

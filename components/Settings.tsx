@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { AppSettings, Tool, GenerateImageSettings } from '../types';
+import { AppSettings, Tool, GenerateImageSettings, VoiceEmotion } from '../types';
 import { ALL_TOOLS } from '../constants/tools';
 import { XMarkIcon, ServerIcon } from './icons';
 
@@ -12,6 +12,7 @@ interface SettingsProps {
 }
 
 const VOICES = ['Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Orus'];
+const EMOTIONS: VoiceEmotion[] = ['neutral', 'happy', 'sad', 'angry'];
 const ASPECT_RATIOS: GenerateImageSettings['aspectRatio'][] = ['1:1', '16:9', '9:16', '4:3', '3:4'];
 
 const ToolConfiguration: React.FC<{ tool: Tool, settings: AppSettings, onSettingsChange: (newSettings: Partial<AppSettings>) => void }> = ({ tool, settings, onSettingsChange }) => {
@@ -103,6 +104,61 @@ export const Settings: React.FC<SettingsProps> = ({ settings, onSettingsChange, 
                   <option key={voice} value={voice}>{voice}</option>
                 ))}
               </select>
+            </div>
+
+            {/* Voice Customization */}
+            <div>
+              <h3 className="text-sm font-medium text-neutral-300 mb-2">Voice Customization</h3>
+              <div className="space-y-4 bg-neutral-800/50 p-3 rounded-md">
+                {/* Emotion Dropdown */}
+                 <div>
+                  <label htmlFor="emotion" className="block text-sm font-medium text-neutral-300 mb-1">
+                    AI Emotion
+                  </label>
+                  <select
+                    id="emotion"
+                    className="w-full bg-neutral-700 border border-neutral-600 rounded-md p-2 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none capitalize"
+                    value={settings.emotion}
+                    onChange={(e) => onSettingsChange({ emotion: e.target.value as VoiceEmotion })}
+                  >
+                    {EMOTIONS.map(emotion => (
+                      <option key={emotion} value={emotion} className="capitalize">{emotion}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Rate Slider */}
+                <div>
+                  <label htmlFor="rate" className="block text-sm font-medium text-neutral-300 mb-1">
+                    Rate ({settings.rate}%)
+                  </label>
+                  <input
+                    id="rate"
+                    type="range"
+                    min="75"
+                    max="150"
+                    step="1"
+                    value={settings.rate}
+                    onChange={(e) => onSettingsChange({ rate: parseInt(e.target.value, 10) })}
+                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                </div>
+                {/* Pitch Slider */}
+                <div>
+                  <label htmlFor="pitch" className="block text-sm font-medium text-neutral-300 mb-1">
+                    Pitch ({settings.pitch > 0 ? '+' : ''}{settings.pitch} st)
+                  </label>
+                  <input
+                    id="pitch"
+                    type="range"
+                    min="-8"
+                    max="8"
+                    step="1"
+                    value={settings.pitch}
+                    onChange={(e) => onSettingsChange({ pitch: parseInt(e.target.value, 10) })}
+                    className="w-full h-2 bg-neutral-700 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Tools */}

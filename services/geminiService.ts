@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, LiveCallbacks, Modality, FunctionDeclaration, GenerateContentResponse } from '@google/genai';
 import { ALL_TOOLS } from '../constants/tools';
 import { AppSettings } from '../types';
@@ -198,32 +199,25 @@ export async function generateLowLatencyText(prompt: string): Promise<string> {
     return response.text;
 }
 
-// Text-to-Speech
-export async function generateSpeech(text: string): Promise<string> {
-    const ai = getAiInstance();
-    const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash-preview-tts",
-        contents: [{ parts: [{ text }] }],
-        config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-                voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
-            },
-        },
-    });
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
-        throw new Error("TTS generation failed, no audio data received.");
-    }
-    return base64Audio;
-}
-
 // Complex Text Generation (for Code, Docs, etc.)
 export async function generateProText(prompt: string): Promise<string> {
     const ai = getAiInstance();
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-pro',
         contents: prompt,
+    });
+    return response.text;
+}
+
+// Text Summarization
+export async function summarizeText(text: string): Promise<string> {
+    const ai = getAiInstance();
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: text,
+        config: {
+            systemInstruction: 'You are an expert at summarizing text. Provide a concise and clear summary of the provided content.',
+        },
     });
     return response.text;
 }

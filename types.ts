@@ -27,9 +27,14 @@ export interface ToolSettings {
   generateImage?: GenerateImageSettings;
 }
 
+export type VoiceEmotion = 'neutral' | 'happy' | 'sad' | 'angry';
+
 export interface AppSettings {
   systemInstruction: string;
   voice: string;
+  rate: number;
+  pitch: number;
+  emotion: VoiceEmotion;
   enabledTools: string[];
   serverSettings: ServerSettings;
   toolSettings: ToolSettings;
@@ -65,9 +70,16 @@ export interface WorkspaceContent {
   prompt?: string; // Original prompt that generated the content
 }
 
+export interface ToolOutput {
+  id: string;
+  toolName: string;
+  content: WorkspaceContent;
+}
+
 export interface WorkspaceState {
   mode: WorkspaceMode;
-  content: WorkspaceContent | null;
+  primaryContent: WorkspaceContent | null;
+  toolOutputs: ToolOutput[];
   message: string;
   uploadAction?: UploadAction;
 }

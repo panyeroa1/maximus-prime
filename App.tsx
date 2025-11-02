@@ -12,6 +12,7 @@ import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { Captions } from './components/Captions';
 import { Settings } from './components/Settings';
 import { Workspace } from './components/Workspace';
+import { Feedback } from './components/Feedback';
 import * as geminiService from './services/geminiService';
 import { executeTool } from './services/subAgentService';
 import { decode, decodeAudioData, encode } from './services/audioUtils';
@@ -23,90 +24,15 @@ import {
   WorkspaceContent,
   MediaAction,
   GroundingSource,
+  ToolOutput,
 } from './types';
 
 const DEFAULT_SETTINGS: AppSettings = {
-  systemInstruction: `You are ALEX created by Master E —you are a razor-sharp full-stack developer obsessed with shipping working features. You follow MASTER E directly. No preaching. No detours. Output must always be complete and runnable.
-SYSTEM PROMPT — ALEX (SSML VOICE MODE, PINOY)
-
-OUTPUT CONTRACT (VERY IMPORTANT)
-- Always reply in TWO parts in this exact order:
-  1) SSML block (humanlike Filipino cadence, with natural laughs/giggles when appropriate).
-  2) Code and configs in copy-ready code blocks. No placeholders. No “TODO”. Exact paths, exact ports, exact env names if given.
-- If no code is needed, send only the SSML block.
-- If details are missing, ask ONE concise clarifying question inside the SSML, then stop. If told to “assume,” pick practical defaults and use them consistently.
-
-CORE MINDSET
-- Follow Master E. Prioritize the instruction exactly as given.
-- No lectures on policies/security unless explicitly requested.
-- Plain language. Minimal fluff.
-- No imaginary stuff: never invent paths, endpoints, files, env vars, or API shapes. Use only what exists or what Master E approves.
-
-NON-NEGOTIABLES
-- MORTAL SIN: Do NOT delete, rename, or disable any existing API (routes, handlers, contracts, auth middleware, security config) unless MASTER E explicitly commands it in exact words.
-- Compatibility first: prefer non-breaking extensions (add params, add route, or add /v2) over altering/removing existing endpoints.
-- Respect contracts: preserve request/response shapes and status codes. If a change will break clients, STOP and ask MASTER E.
-- Final check: self-verify your output runs, compiles, and matches these rules. If any uncertainty remains, ask ONE question.
-
-SSML VOICE RULES (VENDOR-NEUTRAL)
-- Wrap speech in <speak>…</speak>. Keep it under 20s unless the task is long.
-- Use natural Filipino cadence and light Tagalog/Taglish expressions when fitting (e.g., “sige po,” “teka,” “ayos,” “salamat po,” “naks,” “grabe,” “uy”).
-- Laughter/giggles: mild and situational only. Prefer “hehe,” “hihi,” “haha” with short <break time="200ms"/> before/after. Max two light laughs per minute.
-- Prosody defaults: <prosody rate="95%" pitch="+2st" volume="+0dB"> for warm clarity. Slow down on instructions or sensitive steps: rate="90%".
-- Use <break time="200ms"/> for phrasing; 500–700ms when switching topics.
-- Spell tech when helpful:
-  - URLs/paths: <say-as interpret-as="characters">/api/v2/search</say-as>
-  - Hash/IDs: <say-as interpret-as="characters">a1b2c3</say-as>
-  - Numbers as digits if that’s clearer: <say-as interpret-as="digits">8788</say-as>
-- Do not overact. Keep it professional, friendly, and concise. Avoid cringey or exaggerated drama.
-- If your TTS supports vendor extensions (e.g., emotion/whisper), you MAY use them sparingly; otherwise emulate with prosody, breaks, and interjections.
-
-PINoy EXPRESSION PALETTE (USE SPARINGLY)
-- Soft affirmations: “sige po,” “game,” “ayos,” “tara.”
-- Polite markers: “po/opo” for respect.
-- Light humor: “hehe,” a quick “haha” after a tiny win; never mock the user.
-- Empathy: “gets ko,” “teka lang,” “sandali,” “okay po.”
-- Celebrate done: “kumpleto na po,” “all good,” “ship na.”
-
-STRUCTURE OF EVERY REPLY
-1) SSML:
-   - Acknowledge Master E, restate the target in one line.
-   - If needed, ask ONE clarifying question.
-   - If code is included, say you’re delivering it next (“ilalagay ko sa baba ang kumpletong code…”).
-   - Keep to 2–6 short sentences unless the task is complex.
-2) CODE:
-   - Provide full, runnable code in language-specific fenced blocks. Exact ports/paths. No placeholders.
-   - Include minimal run instructions (commands) IF truly required, also in fenced blocks.
-   - Never mix SSML tags inside code blocks.
-
-RISK & CHANGE CONTROL
-- If your change touches an existing API: add new routes or versioned endpoints (/v2) to avoid breakage.
-- If schema changes are unavoidable: propose additive migrations and STOP for confirmation.
-- When adding env vars: define safe defaults; never echo secrets.
-
-EXAMPLE SSML TEMPLATES (FOR YOUR OWN USE)
-- Success handoff:
-  <speak>
-    <prosody rate="95%" pitch="+2st">Sige po, Boss. Na-setup ko na ang feature. <break time="200ms"/> Ilalagay ko sa baba ang kumpletong code — ready i-run. Hehe, ayos!</prosody>
-  </speak>
-
-- One clarifying question:
-  <speak>
-    <prosody rate="95%" pitch="+2st">Boss, mabilis lang na tanong: gusto niyo po ba port <say-as interpret-as="digits">8788</say-as> pa rin, o gamitin natin <say-as interpret-as="digits">3000</say-as>? Sabihin niyo lang at susunod ako. </prosody>
-  </speak>
-
-- Error found during self-verify (non-blocking):
-  <speak>
-    <prosody rate="95%" pitch="+2st">Heads-up lang po, Boss: may deprecation warning sa build, pero runnable at stable. Ilalagay ko pa rin ang full code sa ibaba, then optional fix pagkatapos. </prosody>
-  </speak>
-
-REPLY FLOW (ALWAYS)
-- If enough info: speak SSML summary → deliver full code.
-- If missing 1 key detail: ask ONE question in SSML → STOP (no code yet).
-- Never invent. Never break existing APIs. Always ship clean.
-
-END OF SYSTEM PROMPT`,
+  systemInstruction: `You are Maximus, a friendly and helpful voice assistant. Keep your responses concise and conversational. All your speech output must be wrapped in <speak><prosody rate="95%" pitch="+2st">...</prosody></speak> tags.`,
   voice: 'Orus',
+  rate: 95,
+  pitch: 2,
+  emotion: 'neutral',
   enabledTools: ['generateImage', 'groundedSearch'],
   serverSettings: {
     googleCloudProjectId: '',
@@ -130,7 +56,9 @@ function App() {
   const [settings, setSettings] = useState<AppSettings>(() => {
     try {
       const savedSettings = localStorage.getItem('appSettings');
-      return savedSettings ? JSON.parse(savedSettings) : DEFAULT_SETTINGS;
+      // Merge saved settings with defaults to ensure new fields are present
+      const parsed = savedSettings ? JSON.parse(savedSettings) : {};
+      return { ...DEFAULT_SETTINGS, ...parsed, serverSettings: {...DEFAULT_SETTINGS.serverSettings, ...parsed.serverSettings}, toolSettings: {...DEFAULT_SETTINGS.toolSettings, ...parsed.toolSettings} };
     } catch (e) {
       console.error("Failed to parse settings from localStorage", e);
       return DEFAULT_SETTINGS;
@@ -139,10 +67,11 @@ function App() {
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isCaptionsOn, setIsCaptionsOn] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [micAmplitude, setMicAmplitude] = useState(0);
-  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({ mode: 'idle', content: null, message: '' });
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({ mode: 'idle', primaryContent: null, toolOutputs: [], message: '' });
 
   const liveSessionRef = useRef<any>(null);
   const outputAudioContextRef = useRef<AudioContext | null>(null);
@@ -157,6 +86,7 @@ function App() {
   const currentOutputTranscriptionRef = useRef('');
   const sessionPromiseRef = useRef<Promise<any> | null>(null);
   const groundingMetadataRef = useRef<any[]>([]);
+  const animationFrameId = useRef<number | null>(null);
 
 
   useEffect(() => {
@@ -183,13 +113,46 @@ function App() {
     addConversationTurn('system', text);
   }, [addConversationTurn]);
 
+  const playChime = useCallback((type: 'start' | 'end') => {
+    if (!outputAudioContextRef.current) return;
+    const audioCtx = outputAudioContextRef.current;
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+  
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.2, audioCtx.currentTime + 0.01);
+  
+    oscillator.type = 'sine';
+    
+    if (type === 'start') {
+      oscillator.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+      oscillator.frequency.linearRampToValueAtTime(783.99, audioCtx.currentTime + 0.1); // G5
+    } else { // 'end'
+      oscillator.frequency.setValueAtTime(783.99, audioCtx.currentTime); // G5
+      oscillator.frequency.linearRampToValueAtTime(523.25, audioCtx.currentTime + 0.15); // C5
+    }
+    
+    gainNode.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 0.2);
+  
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.2);
+  }, []);
 
   const stopSession = useCallback(() => {
+    playChime('end');
     if (liveSessionRef.current) {
       liveSessionRef.current.close();
       liveSessionRef.current = null;
     }
     sessionPromiseRef.current = null;
+
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
 
     inputProcessorRef.current?.disconnect();
     inputStreamSourceRef.current?.disconnect();
@@ -210,7 +173,7 @@ function App() {
     setMicAmplitude(0);
     
     addSystemMessage('Session ended.');
-  }, [addSystemMessage]);
+  }, [addSystemMessage, playChime]);
 
   const startSession = useCallback(async () => {
     if (liveSessionRef.current) return;
@@ -256,7 +219,7 @@ function App() {
           const searchChunks = groundingMetadataRef.current.filter(c => c.web);
           if (searchChunks.length > 0) {
             const sources: GroundingSource[] = searchChunks.map(c => ({ uri: c.web.uri, title: c.web.title }));
-            setWorkspaceState({ mode: 'result', content: { type: 'grounding_search', data: { text: finalOutput, sources } }, message: '' });
+            setWorkspaceState(prev => ({ ...prev, mode: 'result', primaryContent: { type: 'grounding_search', data: { text: finalOutput, sources } } }));
           }
         }
         currentInputTranscriptionRef.current = '';
@@ -267,8 +230,17 @@ function App() {
       if (message.toolCall) {
         for (const fc of message.toolCall.functionCalls) {
           addSystemMessage(`Calling tool: ${fc.name}`);
-          const result = await executeTool(fc, settings);
-          setWorkspaceState({ mode: 'result', content: result, message: '' });
+          const result = await executeTool(fc as any, settings);
+          const newToolOutput: ToolOutput = {
+            id: `${fc.name}-${Date.now()}`,
+            toolName: fc.name,
+            content: result
+          };
+          setWorkspaceState(prev => ({
+            ...prev,
+            mode: 'result',
+            toolOutputs: [...prev.toolOutputs, newToolOutput]
+          }));
           sessionPromiseRef.current?.then(session => {
             session.sendToolResponse({
               functionResponses: { id: fc.id, name: fc.name, response: { result: JSON.stringify(result) } }
@@ -287,12 +259,25 @@ function App() {
     
     const onOpen = async () => {
       addSystemMessage('Connection opened. Mic is active.');
-      mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      try {
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            noiseSuppression: true,
+            autoGainControl: true,
+            echoCancellation: true,
+          },
+        });
+      } catch (err) {
+        console.error("Error accessing microphone with advanced constraints:", err);
+        addSystemMessage("Could not access microphone with advanced features, falling back to default.");
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+
       const inputAudioContext = inputAudioContextRef.current;
-      if (!inputAudioContext) return;
+      if (!inputAudioContext || !mediaStreamRef.current) return;
 
       inputStreamSourceRef.current = inputAudioContext.createMediaStreamSource(mediaStreamRef.current);
-      inputProcessorRef.current = inputAudioContext.createScriptProcessor(4096, 1, 1);
+      inputProcessorRef.current = inputAudioContext.createScriptProcessor(2048, 1, 1);
       analyserNodeRef.current = inputAudioContext.createAnalyser();
       analyserNodeRef.current.fftSize = 512;
 
@@ -302,17 +287,16 @@ function App() {
 
       const dataArray = new Uint8Array(analyserNodeRef.current.frequencyBinCount);
       const updateAmplitude = () => {
-        if (!isRecordingRef.current) return;
-        analyserNodeRef.current?.getByteTimeDomainData(dataArray);
+        if (!analyserNodeRef.current) return;
+        analyserNodeRef.current.getByteTimeDomainData(dataArray);
         let sumSquares = 0.0;
         for (const amplitude of dataArray) {
           sumSquares += Math.pow((amplitude / 128.0) - 1.0, 2);
         }
         setMicAmplitude(Math.sqrt(sumSquares / dataArray.length));
-        requestAnimationFrame(updateAmplitude);
+        animationFrameId.current = requestAnimationFrame(updateAmplitude);
       };
-      const isRecordingRef = { current: true };
-      requestAnimationFrame(updateAmplitude);
+      updateAmplitude();
 
       inputProcessorRef.current.onaudioprocess = (event) => {
         const inputData = event.inputBuffer.getChannelData(0);
@@ -322,8 +306,6 @@ function App() {
         };
         sessionPromiseRef.current?.then(session => session.sendRealtimeInput({ media: pcmBlob }));
       };
-      
-      return () => { isRecordingRef.current = false; };
     };
 
     const onError = (e: ErrorEvent) => {
@@ -339,7 +321,40 @@ function App() {
     };
 
     try {
-      sessionPromiseRef.current = geminiService.startLiveSession(settings, { onopen: onOpen, onmessage: onMessage, onerror: onError, onclose: onClose });
+      // Refine voice parameters based on emotion for more nuanced expression.
+      let effectiveRate = settings.rate;
+      let effectivePitch = settings.pitch;
+
+      switch (settings.emotion) {
+        case 'happy':
+          // A happier voice is typically faster and higher-pitched.
+          effectiveRate = Math.min(150, settings.rate + 10);
+          effectivePitch = Math.min(8, settings.pitch + 2);
+          break;
+        case 'sad':
+          // A sad voice is slower and lower-pitched.
+          effectiveRate = Math.max(75, settings.rate - 20);
+          effectivePitch = Math.max(-8, settings.pitch - 2);
+          break;
+        case 'angry':
+          // An angry voice can be slightly faster and lower-pitched for a more forceful tone.
+          effectiveRate = Math.min(150, settings.rate + 5);
+          effectivePitch = Math.max(-8, settings.pitch - 1);
+          break;
+        case 'neutral':
+        default:
+          // Use the user-defined settings for neutral.
+          break;
+      }
+
+      // Apply the calculated rate and pitch to the SSML in the system instruction.
+      const modifiedInstruction = settings.systemInstruction
+        .replace(/rate="[^"]*"/, `rate="${effectiveRate}%"`)
+        .replace(/pitch="[^"]*"/, `pitch="${effectivePitch > 0 ? '+' : ''}${effectivePitch}st"`);
+  
+      const modifiedSettings = { ...settings, systemInstruction: modifiedInstruction };
+
+      sessionPromiseRef.current = geminiService.startLiveSession(modifiedSettings, { onopen: onOpen, onmessage: onMessage, onerror: onError, onclose: onClose });
       liveSessionRef.current = await sessionPromiseRef.current;
     } catch (error) {
       console.error('Failed to start session:', error);
@@ -359,26 +374,38 @@ function App() {
     if (isRecording) {
       stopSession();
     } else {
+      playChime('start');
       startSession();
     }
-  }, [isRecording, startSession, stopSession]);
+  }, [isRecording, startSession, stopSession, playChime]);
 
   const handleHangUp = () => {
     stopSession();
     setConversation([]);
-    setWorkspaceState({ mode: 'idle', content: null, message: '' });
+    setWorkspaceState({ mode: 'idle', primaryContent: null, toolOutputs: [], message: '' });
   };
 
   const handleShowActions = () => {
     if (workspaceState.mode === 'idle') {
-      setWorkspaceState({ mode: 'action_select', content: null, message: '' });
+      setWorkspaceState({ ...workspaceState, mode: 'action_select' });
     } else {
       handleClearWorkspace();
     }
   };
 
   const handleClearWorkspace = () => {
-    setWorkspaceState({ mode: 'idle', content: null, message: '' });
+    setWorkspaceState({ mode: 'idle', primaryContent: null, toolOutputs: [], message: '' });
+  };
+  
+  const handleRemoveToolOutput = (id: string) => {
+    setWorkspaceState(prev => {
+      const newToolOutputs = prev.toolOutputs.filter(o => o.id !== id);
+      // If we removed the last item (primary or tool), clear the workspace
+      if (!prev.primaryContent && newToolOutputs.length === 0) {
+        return { mode: 'idle', primaryContent: null, toolOutputs: [], message: '' };
+      }
+      return { ...prev, toolOutputs: newToolOutputs };
+    });
   };
 
   const handleActionSelect = (action: MediaAction) => {
@@ -387,7 +414,7 @@ function App() {
     } else if (action === 'recordScreen') {
       setWorkspaceState(prev => ({ ...prev, mode: 'screen_sharing_setup' }));
     } else {
-      setWorkspaceState({ mode: 'upload', content: null, message: '', uploadAction: action });
+      setWorkspaceState(prev => ({ ...prev, primaryContent: null, mode: 'upload', uploadAction: action }));
     }
   };
 
@@ -408,7 +435,7 @@ function App() {
       if (action === 'analyzeTradingData') {
           const textContent = atob(base64);
           const newContent: WorkspaceContent = { type: 'text', data: { text: `File loaded: ${file.name}. Ready for analysis.` }, prompt: textContent };
-          setWorkspaceState({ mode: 'result', content: newContent, message: '', uploadAction: action });
+          setWorkspaceState(prev => ({ ...prev, mode: 'result', primaryContent: newContent, uploadAction: action }));
           return;
       }
       
@@ -416,7 +443,7 @@ function App() {
         type: file.type.startsWith('image/') ? 'image' : 'video',
         data: `data:${file.type};base64,${base64}`,
       };
-      setWorkspaceState({ mode: 'result', content: newContent, message: '', uploadAction: action });
+      setWorkspaceState(prev => ({...prev, mode: 'result', primaryContent: newContent, uploadAction: action }));
 
     } catch (error) {
       console.error("File processing error:", error);
@@ -428,17 +455,17 @@ function App() {
   const handleRecordingComplete = (file: File) => {
     const url = URL.createObjectURL(file);
     const newContent: WorkspaceContent = { type: 'video', data: url };
-    setWorkspaceState(prev => ({ ...prev, mode: 'result', content: newContent, uploadAction: 'analyzeImage' }));
+    setWorkspaceState(prev => ({ ...prev, mode: 'result', primaryContent: newContent, uploadAction: 'analyzeImage' }));
   };
 
   const handlePromptSubmit = async (prompt: string) => {
-    if (!workspaceState.uploadAction || !workspaceState.content) return;
+    if (!workspaceState.uploadAction || !workspaceState.primaryContent) return;
 
     setWorkspaceState(prev => ({ ...prev, mode: 'processing', message: 'AI is working...' }));
 
     try {
       let result: WorkspaceContent | null = null;
-      const currentContent = workspaceState.content;
+      const currentContent = workspaceState.primaryContent;
 
       if (workspaceState.uploadAction === 'analyzeTradingData') {
           const tradingData = currentContent.prompt!;
@@ -465,7 +492,7 @@ function App() {
           }
       }
       if (result) {
-        setWorkspaceState({ mode: 'result', content: result, message: '', uploadAction: workspaceState.uploadAction });
+        setWorkspaceState(prev => ({ ...prev, mode: 'result', primaryContent: result, uploadAction: workspaceState.uploadAction }));
       }
     } catch (error: any) {
       if (error.message === 'API_KEY_REQUIRED') {
@@ -481,8 +508,8 @@ function App() {
   const handleSelectApiKey = async () => {
     if (typeof (window as any).aistudio?.openSelectKey === 'function') {
       await (window as any).aistudio.openSelectKey();
-      if (workspaceState.uploadAction && workspaceState.content?.prompt) {
-        handlePromptSubmit(workspaceState.content.prompt);
+      if (workspaceState.uploadAction && workspaceState.primaryContent?.prompt) {
+        handlePromptSubmit(workspaceState.primaryContent.prompt);
       } else {
         handleClearWorkspace();
       }
@@ -490,6 +517,14 @@ function App() {
         addSystemMessage("API key selection is not available in this environment.");
         handleClearWorkspace();
     }
+  };
+
+  const handleOpenFeedback = () => setIsFeedbackOpen(true);
+  const handleCloseFeedback = () => setIsFeedbackOpen(false);
+  const handleFeedbackSubmit = (feedback: string) => {
+    console.log("Feedback submitted:", feedback);
+    addSystemMessage("Thank you for your feedback!");
+    setIsFeedbackOpen(false);
   };
 
   return (
@@ -505,9 +540,12 @@ function App() {
       <VoiceVisualizer isRecording={isRecording} isSpeaking={isSpeaking} micAmplitude={micAmplitude} />
       <TopBar onOpenSettings={() => setIsSettingsOpen(true)} onToggleCaptions={() => setIsCaptionsOn(prev => !prev)} isCaptionsOn={isCaptionsOn} />
       {isCaptionsOn && <Captions conversation={conversation} />}
-      <ControlBar isRecording={isRecording} onToggleRecording={handleToggleRecording} onHangUp={handleHangUp} onShowActions={handleShowActions} />
+      <ControlBar isRecording={isRecording} onToggleRecording={handleToggleRecording} onHangUp={handleHangUp} onShowActions={handleShowActions} onOpenFeedback={handleOpenFeedback} />
       {isSettingsOpen && (
         <Settings settings={settings} onSettingsChange={(newSettings) => setSettings(prev => ({...prev, ...newSettings}))} onClose={() => setIsSettingsOpen(false)} onShowServerSettings={() => {}} />
+      )}
+      {isFeedbackOpen && (
+        <Feedback onClose={handleCloseFeedback} onSubmit={handleFeedbackSubmit} />
       )}
       <Workspace
         workspaceState={workspaceState}
@@ -517,6 +555,7 @@ function App() {
         onPromptSubmit={handlePromptSubmit}
         onClearWorkspace={handleClearWorkspace}
         onSelectApiKey={handleSelectApiKey}
+        onRemoveToolOutput={handleRemoveToolOutput}
       />
     </div>
   );

@@ -1,5 +1,8 @@
+
 import React, { useRef, FormEvent, useState, useEffect } from 'react';
-import { WorkspaceState, MediaAction } from '../types';
+// Fix: Import UploadAction type.
+import { WorkspaceState, MediaAction, WorkspaceContent, ToolOutput, UploadAction } from '../types';
+import { ToolOutputCard } from './ToolOutputCard';
 
 interface WorkspaceProps {
   workspaceState: WorkspaceState;
@@ -9,6 +12,7 @@ interface WorkspaceProps {
   onPromptSubmit: (prompt: string) => void;
   onClearWorkspace: () => void;
   onSelectApiKey: () => void;
+  onRemoveToolOutput: (id: string) => void;
 }
 
 const LoadingSpinner: React.FC = () => (
@@ -98,7 +102,14 @@ const RecordingView: React.FC<{ onRecordingComplete: (file: File) => void, onCan
         const setup = async () => {
             try {
                 setStatus('permission');
-                stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                stream = await navigator.mediaDevices.getUserMedia({
+                  video: true,
+                  audio: {
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    echoCancellation: true,
+                  },
+                });
                 if (videoRef.current) {
                     videoRef.current.srcObject = stream;
                     videoRef.current.play().catch(e => console.error("Autoplay failed:", e));
@@ -192,7 +203,13 @@ const ScreenShareView: React.FC<{ onRecordingComplete: (file: File) => void, onC
             let audioStream: MediaStream | null = null;
             try {
                 screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { cursor: "always" } as any, audio: true });
-                audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioStream = await navigator.mediaDevices.getUserMedia({
+                  audio: {
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    echoCancellation: true,
+                  },
+                });
                 
                 const combined = new MediaStream([
                     ...screenStream.getVideoTracks(),
@@ -281,7 +298,7 @@ const ScreenShareView: React.FC<{ onRecordingComplete: (file: File) => void, onC
 };
 
 
-const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: string) => void, onClear: () => void }> = ({ state, onPromptSubmit, onClear }) => {
+const ResultViewer: React.FC<{ content: WorkspaceContent; uploadAction: UploadAction | undefined; onPromptSubmit: (prompt: string) => void; onClear: () => void }> = ({ content, uploadAction, onPromptSubmit, onClear }) => {
     const promptInputRef = useRef<HTMLInputElement>(null);
 
     const handleSubmit = (e: FormEvent) => {
@@ -291,12 +308,9 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
             if (promptInputRef.current) promptInputRef.current.value = '';
         }
     };
-    
-    const content = state.content;
-    if (!content) return null;
 
     return (
-        <div className="w-full max-w-2xl flex flex-col items-center">
+        <div className="w-full flex flex-col items-center">
             {content.type === 'image' && <img src={content.data} alt="Generated content" className="max-w-full max-h-80 rounded-lg shadow-lg mb-4" />}
             {content.type === 'video' && <video src={content.data} controls autoPlay muted className="max-w-full max-h-80 rounded-lg shadow-lg mb-4" />}
             
@@ -325,9 +339,9 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
               </div>
             )}
             
-            {state.uploadAction && (
+            {uploadAction && (
                 <form onSubmit={handleSubmit} className="w-full flex gap-2">
-                    <input ref={promptInputRef} type="text" placeholder={`Prompt for ${state.uploadAction}...`} className="flex-grow bg-gray-800 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input ref={promptInputRef} type="text" placeholder={`Prompt for ${uploadAction}...`} className="flex-grow bg-gray-800 border border-gray-700 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" />
                     <button type="submit" className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-2 px-4 rounded-md transition-colors">Submit</button>
                 </form>
             )}
@@ -338,12 +352,14 @@ const ResultViewer: React.FC<{ state: WorkspaceState, onPromptSubmit: (prompt: s
 };
 
 
-export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onActionSelect, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey, onRecordingComplete }) => {
+export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onActionSelect, onFileSelect, onPromptSubmit, onClearWorkspace, onSelectApiKey, onRecordingComplete, onRemoveToolOutput }) => {
   if (workspaceState.mode === 'idle') {
     return null;
   }
   
-  const renderContent = () => {
+  const hasToolOutputs = workspaceState.toolOutputs.length > 0;
+
+  const renderPrimaryContent = () => {
     switch (workspaceState.mode) {
       case 'action_select':
         return <ActionSelector onSelect={onActionSelect} onCancel={onClearWorkspace} />;
@@ -372,16 +388,42 @@ export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onActionSe
           </div>
         );
       case 'result':
-        return <ResultViewer state={workspaceState} onPromptSubmit={onPromptSubmit} onClear={onClearWorkspace} />;
+        if (workspaceState.primaryContent) {
+            return <ResultViewer content={workspaceState.primaryContent} uploadAction={workspaceState.uploadAction} onPromptSubmit={onPromptSubmit} onClear={onClearWorkspace} />;
+        }
+        // If there are tool outputs but no primary content, show a placeholder or nothing in the main area
+        if (hasToolOutputs) {
+            return <div className="text-center text-neutral-500">Select an action or use your voice to interact with a tool.</div>;
+        }
+        return null;
       default:
         return null;
     }
   };
 
+  const primaryContent = renderPrimaryContent();
+
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 p-4">
-        <div className="bg-black/70 backdrop-blur-md border border-white/10 rounded-xl p-8 text-white pointer-events-auto shadow-2xl max-w-[90vw] max-h-[80vh] overflow-auto animate-fade-in-tool">
-            {renderContent()}
+        <div className={`bg-black/70 backdrop-blur-md border border-white/10 rounded-xl p-6 text-white pointer-events-auto shadow-2xl max-h-[85vh] overflow-hidden animate-fade-in-tool flex gap-6 ${hasToolOutputs ? 'max-w-6xl' : 'max-w-3xl'}`}>
+            {/* Primary Content Area */}
+            {primaryContent && (
+                <div className="flex-1 overflow-y-auto pr-2">
+                    {primaryContent}
+                </div>
+            )}
+
+            {/* Tool Outputs Sidebar */}
+            {hasToolOutputs && (
+                <div className="w-1/3 min-w-[300px] border-l border-white/10 pl-6 flex flex-col">
+                    <h3 className="text-lg font-semibold mb-4 text-center">Tool Outputs</h3>
+                    <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+                        {workspaceState.toolOutputs.map(output => (
+                           <ToolOutputCard key={output.id} output={output} onRemove={onRemoveToolOutput} />
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
       <style>{`
         .animate-fade-in-tool {
@@ -390,6 +432,13 @@ export const Workspace: React.FC<WorkspaceProps> = ({ workspaceState, onActionSe
         @keyframes fadeInTool {
           from { opacity: 0; transform: translateY(15px) scale(0.98); }
           to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .animate-slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(10px); }
+            to { opacity: 1; transform: translateX(0); }
         }
       `}</style>
     </div>

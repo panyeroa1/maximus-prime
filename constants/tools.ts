@@ -79,4 +79,22 @@ export const ALL_TOOLS: Tool[] = [
     name: 'groundedMapSearch',
     description: 'Perform a Google Maps search to find information about places.',
   },
+  {
+    name: 'summarizeText',
+    description: 'Generates a concise summary of a given block of text.',
+    functionDeclaration: {
+      name: 'summarizeText',
+      description: 'Summarizes a long piece of text into a few key points or paragraphs.',
+      parameters: {
+        type: Type.OBJECT,
+        properties: {
+          text: {
+            type: Type.STRING,
+            description: 'The block of text that needs to be summarized.',
+          },
+        },
+        required: ['text'],
+      },
+    },
+  },
 ];
