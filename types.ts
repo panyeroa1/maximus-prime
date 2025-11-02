@@ -1,68 +1,12 @@
-// FIX: Removed invalid file headers.
+// FIX: Added missing type definitions.
 import { FunctionDeclaration } from '@google/genai';
 
+export type Speaker = 'user' | 'model' | 'system';
+
 export interface ConversationTurn {
-  speaker: 'user' | 'model' | 'system';
+  speaker: Speaker;
   text: string;
   timestamp: number;
-}
-
-export interface ServerSettings {
-  googleCloudProjectId: string;
-  googleCloudServiceAccountJson: string;
-  twilioSid: string;
-  twilioAuthToken: string;
-  blandApiKey: string;
-  cartesiaApiKey: string;
-  elevenLabsApiKey: string;
-  ollamaCloudEndpoint: string;
-  ollamaCloudApiKey: string;
-}
-
-export interface GenerateImageSettings {
-  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
-}
-
-export interface ToolSettings {
-  generateImage?: GenerateImageSettings;
-}
-
-export type VoiceEmotion = 'neutral' | 'happy' | 'sad' | 'angry';
-export type CallerPersona = 'Neutral' | 'Anxious' | 'Frustrated' | 'Tired' | 'Cheerful';
-export type CallerLanguage =
-  | 'English (US)'
-  | 'English (UK)'
-  | 'English (Australian)'
-  | 'English (Indian)'
-  | 'English (Arabic Native)'
-  | 'Spanish (Spain)'
-  | 'Spanish (Mexican)'
-  | 'French (France)'
-  | 'German'
-  | 'Mandarin Chinese';
-
-export interface SystemPrompt {
-  role: string;
-  primaryGoals: string;
-  voiceCadence: string;
-  emotionalStance: string;
-  interactionRules: string;
-  behavioralFlow: string;
-  additionalInstructions: string;
-}
-
-export interface AppSettings {
-  systemPromptParts: SystemPrompt;
-  systemInstruction: string;
-  voice: string;
-  rate: number;
-  pitch: number;
-  emotion: VoiceEmotion;
-  callerPersona: CallerPersona;
-  language: CallerLanguage;
-  enabledTools: string[];
-  serverSettings: ServerSettings;
-  toolSettings: ToolSettings;
 }
 
 export interface Tool {
@@ -72,28 +16,34 @@ export interface Tool {
   functionDeclaration?: FunctionDeclaration;
 }
 
-export interface ActiveToolCall {
-  name: string;
-  args: any;
+export type CallerLanguage = 'Default' | 'English (Indian)' | 'English (Turkish Native)';
+
+export interface AppSettings {
+  voice: 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';
+  enabledTools: string[];
+  systemInstruction: string;
+  language: CallerLanguage;
+  toolSettings: {
+    generateImage?: {
+      aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4';
+    };
+  };
 }
 
-// Workspace State Types
-export type WorkspaceMode = 'idle' | 'action_select' | 'upload' | 'processing' | 'result' | 'api_key_needed' | 'recording' | 'screen_sharing_setup';
+export type MediaAction = 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'recordMedia' | 'recordScreen' | 'analyzeTradingData';
 
+export type WorkspaceMode = 'idle' | 'action_select' | 'upload' | 'recording' | 'screen_sharing_setup' | 'processing' | 'result' | 'api_key_needed';
+
+// FIX: Added missing UploadAction type that was referenced in Workspace.tsx.
 export type UploadAction = 'analyzeImage' | 'editImage' | 'generateVideo' | 'transcribeAudio' | 'analyzeTradingData';
-export type MediaAction = UploadAction | 'recordMedia' | 'recordScreen';
 
 
-export interface GroundingSource {
-  uri: string;
-  title: string;
-}
-
-export interface WorkspaceContent {
-  type: 'image' | 'video' | 'text' | 'grounding_search' | 'grounding_maps' | 'code';
-  data: any; // URL for image/video, text string, GroundingSource[], or { text: string; language: string } for code
-  prompt?: string; // Original prompt that generated the content
-}
+export type WorkspaceContent = {
+  type: 'image' | 'video' | 'text' | 'code' | 'grounding_search' | 'grounding_maps';
+  data: any; // string for image/video url, object for others
+  prompt?: string;
+  sources?: { uri: string; title: string }[];
+};
 
 export interface ToolOutput {
   id: string;
@@ -103,34 +53,19 @@ export interface ToolOutput {
 
 export interface WorkspaceState {
   mode: WorkspaceMode;
-  primaryContent: WorkspaceContent | null;
-  toolOutputs: ToolOutput[];
-  message: string;
   uploadAction?: UploadAction;
+  message?: string;
+  primaryContent?: WorkspaceContent;
+  uploadedFile?: {
+    file: File;
+    base64: string;
+    mimeType: string;
+  };
+  toolOutputs: ToolOutput[];
 }
 
-// Dialer Page Types
-export type CallState = 'keypad' | 'ringing' | 'connected' | 'on-hold' | 'summary';
-
-export interface CallTranscriptEntry {
-  speaker: 'ivr' | 'agent' | 'user' | 'system';
-  text: string;
-}
-
-export type CallType = 'outgoing' | 'incoming' | 'missed';
-
-export interface CallHistoryEntry {
+export interface ActiveToolCall {
   id: string;
-  contactName: string;
-  number: string;
-  type: CallType;
-  timestamp: number; // Date.now()
-  duration: number; // in seconds
-}
-
-export interface Contact {
-  id: string;
-  firstName: string;
-  lastName: string;
-  number: string;
+  name: string;
+  args: any;
 }
