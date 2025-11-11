@@ -666,7 +666,6 @@ const App: React.FC = () => {
     <main className="h-screen w-screen bg-black text-white overflow-hidden font-sans">
       <div className="relative h-full w-full flex flex-col items-center justify-center">
         <TopBar
-          onOpenSettings={() => setShowSettings(true)}
           onToggleCaptions={() => setShowCaptions(p => !p)}
           isCaptionsOn={showCaptions}
           onNavigateToDialer={() => console.log('Dialer navigation not implemented.')}
