@@ -54,10 +54,7 @@ const ActionSelector: React.FC<{ onSelect: (action: MediaAction) => void; onCanc
 };
 
 
-const UploadBox: React.FC<{
-  onFileSelect: (file: File) => void;
-  uploadAction: WorkspaceState['uploadAction'];
-}> = ({ onFileSelect, uploadAction }) => {
+const UploadBox: React.FC<{ onFileSelect: (file: File), uploadAction: WorkspaceState['uploadAction'] }> = ({ onFileSelect, uploadAction }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
