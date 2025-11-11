@@ -1,6 +1,6 @@
 // FIX: Removed invalid file header.
 import React from 'react';
-import { MicrophoneIcon, SparklesIcon, HandThumbUpIcon, XMarkIcon, ArrowUturnRightIcon } from './icons';
+import { MicrophoneIcon, SparklesIcon, VideoCameraIcon, ComputerDesktopIcon, PhoneHangUpIcon } from './icons';
 
 interface ControlBarProps {
   isRecording: boolean;
@@ -9,8 +9,8 @@ interface ControlBarProps {
   onToggleRecording: () => void;
   onHangUp: () => void;
   onShowActions: () => void;
-  onOpenFeedback: () => void;
-  onSkipTurn: () => void;
+  onRecordMedia: () => void;
+  onRecordScreen: () => void;
 }
 
 export const ControlBar: React.FC<ControlBarProps> = ({
@@ -20,8 +20,8 @@ export const ControlBar: React.FC<ControlBarProps> = ({
   onToggleRecording,
   onHangUp,
   onShowActions,
-  onOpenFeedback,
-  onSkipTurn,
+  onRecordMedia,
+  onRecordScreen,
 }) => {
   return (
     <div className="fixed bottom-0 left-0 right-0 p-4 pb-8 flex justify-center items-center z-20">
@@ -33,6 +33,15 @@ export const ControlBar: React.FC<ControlBarProps> = ({
           aria-label="Show Actions"
         >
           <SparklesIcon className="w-8 h-8 text-white" />
+        </button>
+
+        {/* Record Video Button */}
+        <button
+          onClick={onRecordMedia}
+          className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
+          aria-label="Record Video"
+        >
+          <VideoCameraIcon className="w-8 h-8 text-white" />
         </button>
 
         {/* Microphone Button & Visualizer */}
@@ -64,23 +73,15 @@ export const ControlBar: React.FC<ControlBarProps> = ({
         </div>
 
 
-        {/* Feedback Button */}
+        {/* Record Screen Button */}
         <button
-          onClick={onOpenFeedback}
+          onClick={onRecordScreen}
           className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
-          aria-label="Send Feedback"
+          aria-label="Record Screen"
         >
-          <HandThumbUpIcon className="w-8 h-8 text-white" />
+          <ComputerDesktopIcon className="w-8 h-8 text-white" />
         </button>
 
-        {/* Skip Turn Button */}
-        <button
-          onClick={onSkipTurn}
-          className="w-16 h-16 rounded-full bg-neutral-800 hover:bg-neutral-700 transition-colors flex items-center justify-center"
-          aria-label="Skip Turn"
-        >
-          <ArrowUturnRightIcon className="w-8 h-8 text-white" />
-        </button>
 
         {/* Hang Up Button */}
         <button
@@ -88,7 +89,7 @@ export const ControlBar: React.FC<ControlBarProps> = ({
           className="w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 transition-colors flex items-center justify-center"
           aria-label="Hang Up"
         >
-          <XMarkIcon className="w-8 h-8 text-white" />
+          <PhoneHangUpIcon className="w-8 h-8 text-white" />
         </button>
       </div>
        <style>{`

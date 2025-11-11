@@ -16,7 +16,7 @@ export interface Tool {
   functionDeclaration?: FunctionDeclaration;
 }
 
-export type CallerLanguage = 'Default' | 'English (Indian)' | 'English (Turkish Native)';
+export type CallerLanguage = 'Default' | 'English (Indian)' | 'English (Turkish Native)' | 'Filipino (Taglish)';
 
 export interface AppSettings {
   voice: 'Zephyr' | 'Puck' | 'Charon' | 'Kore' | 'Fenrir';

@@ -1,15 +1,16 @@
 // FIX: Removed invalid file header.
 import React from 'react';
-import { CCIcon, SpeakerWaveIcon, AdjustmentsHorizontalIcon, PhoneIcon } from './icons';
+import { CCIcon, SpeakerWaveIcon, AdjustmentsHorizontalIcon, PhoneIcon, ChatBubbleLeftEllipsisIcon } from './icons';
 
 interface TopBarProps {
   onOpenSettings: () => void;
   onToggleCaptions: () => void;
   isCaptionsOn: boolean;
   onNavigateToDialer: () => void;
+  onOpenFeedback: () => void;
 }
 
-export const TopBar: React.FC<TopBarProps> = ({ onOpenSettings, onToggleCaptions, isCaptionsOn, onNavigateToDialer }) => {
+export const TopBar: React.FC<TopBarProps> = ({ onOpenSettings, onToggleCaptions, isCaptionsOn, onNavigateToDialer, onOpenFeedback }) => {
   return (
     <div className="fixed top-0 left-0 right-0 p-4 flex justify-between items-center z-20 bg-gradient-to-b from-black/50 to-transparent">
       <button
@@ -27,6 +28,13 @@ export const TopBar: React.FC<TopBarProps> = ({ onOpenSettings, onToggleCaptions
           aria-label={isCaptionsOn ? 'Hide Captions' : 'Show Captions'}
         >
           <CCIcon className="w-6 h-6" />
+        </button>
+        <button
+          onClick={onOpenFeedback}
+          className="text-gray-300 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"
+          aria-label="Send Feedback"
+        >
+          <ChatBubbleLeftEllipsisIcon className="w-6 h-6" />
         </button>
         <button
           className="text-gray-300 hover:text-white transition-colors p-2 rounded-full hover:bg-white/10"

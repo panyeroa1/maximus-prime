@@ -16,8 +16,18 @@ function getAiInstance(): GoogleGenAI {
 }
 
 // Live Session
-export function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks): Promise<any> {
-  const ai = getAiInstance();
+export async function startLiveSession(settings: AppSettings, callbacks: LiveCallbacks): Promise<any> {
+  if (typeof (window as any).aistudio?.hasSelectedApiKey !== 'function') {
+    throw new Error("This feature requires API key selection. Please run in the correct environment.");
+  }
+
+  const keySelected = await (window as any).aistudio.hasSelectedApiKey();
+  if (!keySelected) {
+      throw new Error('API_KEY_REQUIRED');
+  }
+  
+  // Create a new instance to ensure the latest key is used.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   const functionDeclarations: FunctionDeclaration[] = ALL_TOOLS
     .filter(tool => settings.enabledTools.includes(tool.name) && tool.functionDeclaration)
